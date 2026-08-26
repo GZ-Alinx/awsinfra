@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
 )
 
 var (
@@ -741,7 +741,7 @@ func (s *Service) SyncJobJenkinsfile(ctx context.Context, project string, job ci
 func (s *Service) registerRepositories(ctx context.Context, delivery ProjectDelivery) error {
 	items := []cicd.Repository{
 		{Key: "ops-delivery-jenkinsfiles", ProjectKey: delivery.ProjectKey, DisplayName: "项目部署流水线", Provider: "gitlab", Purpose: "jenkinsfile", CloneURL: delivery.JenkinsfilesCloneURL, DefaultBranch: delivery.DefaultBranch, DefaultPath: "environments", Description: "按环境保存 Jenkinsfile、services.groovy 和平台托管 Dockerfile"},
-		{Key: "ops-delivery-manifests", ProjectKey: delivery.ProjectKey, DisplayName: "项目部署清单", Provider: "gitlab", Purpose: "manifest", CloneURL: delivery.ManifestsCloneURL, DefaultBranch: delivery.DefaultBranch, DefaultPath: "environments", Description: "由运维自动部署平台创建，仅属于当前项目"},
+		{Key: "ops-delivery-manifests", ProjectKey: delivery.ProjectKey, DisplayName: "项目部署清单", Provider: "gitlab", Purpose: "manifest", CloneURL: delivery.ManifestsCloneURL, DefaultBranch: delivery.DefaultBranch, DefaultPath: "environments", Description: "由 AWS 部署平台创建，仅属于当前项目"},
 	}
 	if unifiedDelivery(delivery) {
 		items = append([]cicd.Repository{{

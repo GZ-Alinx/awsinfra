@@ -1,4 +1,4 @@
-module ops-deploy-platform
+module github.com/GZ-Alinx/awsinfra
 
 go 1.25.13
 

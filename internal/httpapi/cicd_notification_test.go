@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"ops-deploy-platform/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
 )
 
 func TestManagedLarkCredentialIdentityIsStableAndScoped(t *testing.T) {

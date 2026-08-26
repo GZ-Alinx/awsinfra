@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/auth"
-	"ops-deploy-platform/internal/environment"
-	"ops-deploy-platform/internal/jobs"
+	"github.com/GZ-Alinx/awsinfra/internal/auth"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/jobs"
 )
 
 func (s *Server) listClickVisualStackStorage(w http.ResponseWriter, r *http.Request) {

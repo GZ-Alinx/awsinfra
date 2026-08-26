@@ -24,8 +24,8 @@ helm version
 ## 2. 初始化
 
 ```console
-git clone https://github.com/GZ-Alinx/ops-deploy-platform.git
-cd ops-deploy-platform
+git clone https://github.com/GZ-Alinx/awsinfra.git
+cd awsinfra
 go run ./cmd/ops-deploy init --config config.yaml
 ```
 

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"ops-deploy-platform/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
 )
 
 func (s *Server) projectEnvironmentApplicationTopology(w http.ResponseWriter, r *http.Request) {

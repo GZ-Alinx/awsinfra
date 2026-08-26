@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/awscredentials"
-	"ops-deploy-platform/internal/cicd"
-	"ops-deploy-platform/internal/gitlab"
-	"ops-deploy-platform/internal/kubetunnel"
-	"ops-deploy-platform/internal/persistence"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/awscredentials"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/gitlab"
+	"github.com/GZ-Alinx/awsinfra/internal/kubetunnel"
+	"github.com/GZ-Alinx/awsinfra/internal/persistence"
 )
 
 type smokeResult struct {
@@ -143,13 +143,13 @@ func run() error {
 	// ownership and never mistakes a relay URL for a different repository.
 	if _, err := cicdService.SaveRepository(ctx, *project, "ops-delivery-jenkinsfiles", cicd.Repository{
 		Key: "ops-delivery-jenkinsfiles", DisplayName: "项目部署流水线", Provider: "gitlab", Purpose: "jenkinsfile",
-		CloneURL: delivery.JenkinsfilesCloneURL, DefaultBranch: delivery.DefaultBranch, DefaultPath: "jobs", Description: "由运维自动部署平台创建，仅属于当前项目",
+		CloneURL: delivery.JenkinsfilesCloneURL, DefaultBranch: delivery.DefaultBranch, DefaultPath: "jobs", Description: "由 AWS 部署平台创建，仅属于当前项目",
 	}); err != nil {
 		return err
 	}
 	if _, err := cicdService.SaveRepository(ctx, *project, "ops-delivery-manifests", cicd.Repository{
 		Key: "ops-delivery-manifests", DisplayName: "项目部署清单", Provider: "gitlab", Purpose: "manifest",
-		CloneURL: delivery.ManifestsCloneURL, DefaultBranch: delivery.DefaultBranch, DefaultPath: "environments", Description: "由运维自动部署平台创建，仅属于当前项目",
+		CloneURL: delivery.ManifestsCloneURL, DefaultBranch: delivery.DefaultBranch, DefaultPath: "environments", Description: "由 AWS 部署平台创建，仅属于当前项目",
 	}); err != nil {
 		return err
 	}
@@ -556,7 +556,7 @@ USER nonroot:nonroot
 ENTRYPOINT ["/app"]
 `},
 		{Path: ".dockerignore", Content: ".git\n.ops-*\nREADME.md\n"},
-		{Path: "README.md", Content: "# " + service + "\n\n由运维自动部署平台创建，用于验证 Go、Jenkinsfile、ECR 与 Kubernetes 部署闭环。\n"},
+		{Path: "README.md", Content: "# " + service + "\n\n由 AWS 部署平台创建，用于验证 Go、Jenkinsfile、ECR 与 Kubernetes 部署闭环。\n"},
 	}
 }
 

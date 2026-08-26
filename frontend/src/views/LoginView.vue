@@ -1,6 +1,6 @@
 <template>
   <div class="login-page">
-    <div class="login-brand"><strong>运维自动部署平台</strong></div>
+    <div class="login-brand"><strong>AWSInfra · AWS 部署平台</strong></div>
     <section class="login-visual">
       <div class="visual-copy">
         <p>AWS INFRASTRUCTURE AUTOMATION</p>
@@ -11,7 +11,7 @@
     </section>
     <section class="login-panel">
       <div class="login-box">
-        <div class="login-heading"><h2>登录运维自动部署平台</h2><p>输入平台账号以继续访问</p></div>
+        <div class="login-heading"><h2>登录 AWS 部署平台</h2><p>输入平台账号以继续访问</p></div>
         <a-alert v-if="errorMessage" type="error" :show-icon="true" closable @close="errorMessage = ''">{{ errorMessage }}</a-alert>
         <a-form ref="formRef" :model="form" layout="vertical" size="large" @submit-success="submit">
           <a-form-item field="username" label="用户名" :rules="[{ required: true, message: '请输入用户名' }]">

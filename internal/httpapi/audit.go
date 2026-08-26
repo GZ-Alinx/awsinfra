@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/auditlog"
+	"github.com/GZ-Alinx/awsinfra/internal/auditlog"
 )
 
 func (s *Server) listAuditEvents(w http.ResponseWriter, r *http.Request) {

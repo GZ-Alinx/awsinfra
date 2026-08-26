@@ -13,15 +13,15 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/redis/go-redis/v9"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/auditlog"
-	"ops-deploy-platform/internal/awscredentials"
-	"ops-deploy-platform/internal/componentcatalog"
-	"ops-deploy-platform/internal/dataservicecredentials"
-	"ops-deploy-platform/internal/jobs"
-	"ops-deploy-platform/internal/staticcdn"
-	"ops-deploy-platform/internal/tlscertificates"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/auditlog"
+	"github.com/GZ-Alinx/awsinfra/internal/awscredentials"
+	"github.com/GZ-Alinx/awsinfra/internal/componentcatalog"
+	"github.com/GZ-Alinx/awsinfra/internal/dataservicecredentials"
+	"github.com/GZ-Alinx/awsinfra/internal/jobs"
+	"github.com/GZ-Alinx/awsinfra/internal/staticcdn"
+	"github.com/GZ-Alinx/awsinfra/internal/tlscertificates"
 )
 
 type Services struct {

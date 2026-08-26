@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/environment"
-	"ops-deploy-platform/internal/jobs"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/jobs"
 )
 
 type managedPVC struct {

@@ -19,7 +19,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"ops-deploy-platform/internal/sensitive"
+	"github.com/GZ-Alinx/awsinfra/internal/sensitive"
 )
 
 var (

@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"ops-deploy-platform/internal/auth"
-	"ops-deploy-platform/internal/statebackend"
+	"github.com/GZ-Alinx/awsinfra/internal/auth"
+	"github.com/GZ-Alinx/awsinfra/internal/statebackend"
 )
 
 type terraformStateLocation struct {

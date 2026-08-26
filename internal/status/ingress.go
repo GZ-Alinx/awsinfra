@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
 
 	"gopkg.in/yaml.v3"
 )

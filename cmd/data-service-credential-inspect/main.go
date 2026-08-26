@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/dataservicecredentials"
-	"ops-deploy-platform/internal/persistence"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/dataservicecredentials"
+	"github.com/GZ-Alinx/awsinfra/internal/persistence"
 )
 
 func main() {

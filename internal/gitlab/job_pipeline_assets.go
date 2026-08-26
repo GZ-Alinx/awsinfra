@@ -9,7 +9,7 @@ func renderOpsPipelineLibrary() string {
 	})
 }
 
-const opsPipelineLibrary = `// 由运维自动部署平台管理；平台重新同步时会覆盖本文件。
+const opsPipelineLibrary = `// 由 AWS 部署平台管理；平台重新同步时会覆盖本文件。
 /*
  * 公共流水线运行模块
  * =============================================================================

@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
 )
 
 var (

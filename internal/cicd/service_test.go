@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"ops-deploy-platform/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
 )
 
 func TestGitLabWebhookSecretLifecycle(t *testing.T) {

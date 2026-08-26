@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"ops-deploy-platform/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
 )
 
 func ingressTestDocument() environment.Document {

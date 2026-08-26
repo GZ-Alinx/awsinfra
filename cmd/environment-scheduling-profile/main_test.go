@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"ops-deploy-platform/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
 )
 
 func TestDeferredCapacityKeepsScaleOutCeilings(t *testing.T) {

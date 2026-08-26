@@ -18,8 +18,8 @@ import (
 
 	"golang.org/x/crypto/argon2"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
 )
 
 const CookieName = "ops_deploy_session"

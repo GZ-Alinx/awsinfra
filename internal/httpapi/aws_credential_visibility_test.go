@@ -3,8 +3,8 @@ package httpapi
 import (
 	"testing"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/awscredentials"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/awscredentials"
 )
 
 func TestVisibleAWSCredentialsKeepsArchivedCredentialsForManagers(t *testing.T) {

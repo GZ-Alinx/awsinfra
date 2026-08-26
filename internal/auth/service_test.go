@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
 )
 
 type testUserStore struct {

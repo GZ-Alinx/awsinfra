@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"ops-deploy-platform/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
 )
 
 func TestDesiredEKSNodeGroupNamesAreStable(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/selfdeploy"
+	"github.com/GZ-Alinx/awsinfra/internal/selfdeploy"
 )
 
 func main() {

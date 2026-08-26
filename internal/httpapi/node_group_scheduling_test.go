@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"ops-deploy-platform/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
 )
 
 func TestNodeGroupPlanningLock(t *testing.T) {

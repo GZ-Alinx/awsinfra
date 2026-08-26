@@ -86,7 +86,7 @@ func legacyKustomizationFiles(delivery ProjectDelivery) []GeneratedFile {
 }
 
 func jenkinsfilesReadme(project string) string {
-	return "# " + project + " 部署流水线\n\n本仓库仅属于项目 `" + project + "`，由运维自动部署平台管理。\n\n```text\nenvironments/<env>/pipelines/<job>/Jenkinsfile\nenvironments/<env>/pipelines/<job>/services.groovy\nenvironments/<env>/dockerfiles/<service>/Dockerfile\nlib/v4/opsPipeline.groovy\nlib/v4/scripts/\n```\n\n- Jenkinsfile 与平台托管 Dockerfile 都按 dev/test/uat/prod 环境隔离。\n- 一个 Job 可以关联多个服务，但一次 Jenkins 构建只处理一个服务。\n- 依赖安装、编译、测试和镜像内容由 Dockerfile 负责；Jenkinsfile 不重复实现业务构建。\n- 服务也可选择直接使用业务源码仓库内的 Dockerfile。\n- 仓库地址、分支、Namespace、镜像仓库和 Credential ID 来自平台配置；Token、密码等明文不得写入本仓库。\n"
+	return "# " + project + " 部署流水线\n\n本仓库仅属于项目 `" + project + "`，由 AWS 部署平台管理。\n\n```text\nenvironments/<env>/pipelines/<job>/Jenkinsfile\nenvironments/<env>/pipelines/<job>/services.groovy\nenvironments/<env>/dockerfiles/<service>/Dockerfile\nlib/v4/opsPipeline.groovy\nlib/v4/scripts/\n```\n\n- Jenkinsfile 与平台托管 Dockerfile 都按 dev/test/uat/prod 环境隔离。\n- 一个 Job 可以关联多个服务，但一次 Jenkins 构建只处理一个服务。\n- 依赖安装、编译、测试和镜像内容由 Dockerfile 负责；Jenkinsfile 不重复实现业务构建。\n- 服务也可选择直接使用业务源码仓库内的 Dockerfile。\n- 仓库地址、分支、Namespace、镜像仓库和 Credential ID 来自平台配置；Token、密码等明文不得写入本仓库。\n"
 }
 
 func manifestsReadme(project string) string {
@@ -94,7 +94,7 @@ func manifestsReadme(project string) string {
 }
 
 func deliveryReadme(project string) string {
-	return "# " + project + " 运维交付仓库\n\n本仓库由运维自动部署平台管理，通过环境目录保存 Jenkinsfile、Dockerfile 与 Kubernetes 部署清单。\n\n```text\nenvironments/\n  dev|test|uat|prod/\n    pipelines/<job>/Jenkinsfile\n    pipelines/<job>/services.groovy\n    dockerfiles/<service>/Dockerfile\n    <service>/manifest.yaml\nlib/                         # 平台流水线公共模块\n```\n\n- Job 固定绑定一个环境，不能在构建时切换到其他环境。\n- Jenkinsfile、Dockerfile 与部署清单位于同一仓库、同一环境目录，test/prod 互不覆盖。\n- Token、密码等秘密不得写入仓库。\n"
+	return "# " + project + " 运维交付仓库\n\n本仓库由 AWS 部署平台管理，通过环境目录保存 Jenkinsfile、Dockerfile 与 Kubernetes 部署清单。\n\n```text\nenvironments/\n  dev|test|uat|prod/\n    pipelines/<job>/Jenkinsfile\n    pipelines/<job>/services.groovy\n    dockerfiles/<service>/Dockerfile\n    <service>/manifest.yaml\nlib/                         # 平台流水线公共模块\n```\n\n- Job 固定绑定一个环境，不能在构建时切换到其他环境。\n- Jenkinsfile、Dockerfile 与部署清单位于同一仓库、同一环境目录，test/prod 互不覆盖。\n- Token、密码等秘密不得写入仓库。\n"
 }
 
 func renderServiceMetadata(service ServiceSpec) string {

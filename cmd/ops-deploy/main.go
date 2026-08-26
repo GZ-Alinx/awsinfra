@@ -24,26 +24,26 @@ import (
 
 	"golang.org/x/term"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/auth"
-	"ops-deploy-platform/internal/awscatalog"
-	"ops-deploy-platform/internal/awscredentials"
-	"ops-deploy-platform/internal/cicd"
-	"ops-deploy-platform/internal/componentcatalog"
-	"ops-deploy-platform/internal/dataservicecredentials"
-	"ops-deploy-platform/internal/environment"
-	"ops-deploy-platform/internal/gitlab"
-	"ops-deploy-platform/internal/httpapi"
-	"ops-deploy-platform/internal/jobs"
-	"ops-deploy-platform/internal/kubetunnel"
-	"ops-deploy-platform/internal/persistence"
-	"ops-deploy-platform/internal/resourcecenter"
-	"ops-deploy-platform/internal/runner"
-	"ops-deploy-platform/internal/statebackend"
-	"ops-deploy-platform/internal/staticcdn"
-	statusservice "ops-deploy-platform/internal/status"
-	"ops-deploy-platform/internal/tlscertificates"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/auth"
+	"github.com/GZ-Alinx/awsinfra/internal/awscatalog"
+	"github.com/GZ-Alinx/awsinfra/internal/awscredentials"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/componentcatalog"
+	"github.com/GZ-Alinx/awsinfra/internal/dataservicecredentials"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/gitlab"
+	"github.com/GZ-Alinx/awsinfra/internal/httpapi"
+	"github.com/GZ-Alinx/awsinfra/internal/jobs"
+	"github.com/GZ-Alinx/awsinfra/internal/kubetunnel"
+	"github.com/GZ-Alinx/awsinfra/internal/persistence"
+	"github.com/GZ-Alinx/awsinfra/internal/resourcecenter"
+	"github.com/GZ-Alinx/awsinfra/internal/runner"
+	"github.com/GZ-Alinx/awsinfra/internal/statebackend"
+	"github.com/GZ-Alinx/awsinfra/internal/staticcdn"
+	statusservice "github.com/GZ-Alinx/awsinfra/internal/status"
+	"github.com/GZ-Alinx/awsinfra/internal/tlscertificates"
 )
 
 func main() {
@@ -328,7 +328,7 @@ func serve(config *appconfig.Config, environments *environment.Repository, jobMa
 	if config.Server.TLSCertFile != "" {
 		scheme = "https"
 	}
-	log.Printf("运维自动部署平台 %s 已启动：%s://%s", httpapi.Version, scheme, config.Server.ListenAddress)
+	log.Printf("AWS 部署平台 %s 已启动：%s://%s", httpapi.Version, scheme, config.Server.ListenAddress)
 	var serveErr error
 	if config.Server.TLSCertFile != "" {
 		serveErr = server.ListenAndServeTLS(config.Server.TLSCertFile, config.Server.TLSKeyFile)

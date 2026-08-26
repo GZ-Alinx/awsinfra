@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/environment"
-	statusservice "ops-deploy-platform/internal/status"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	statusservice "github.com/GZ-Alinx/awsinfra/internal/status"
 )
 
 type memoryResourceStore struct {

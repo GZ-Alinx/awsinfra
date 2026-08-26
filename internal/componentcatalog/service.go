@@ -17,8 +17,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/sensitive"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/sensitive"
 )
 
 var (

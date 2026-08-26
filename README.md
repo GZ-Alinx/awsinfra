@@ -1,6 +1,6 @@
-# Ops Deploy Platform · 运维自动部署平台
+# AWSInfra · AWS 部署平台
 
-[![CI](https://github.com/GZ-Alinx/ops-deploy-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/GZ-Alinx/ops-deploy-platform/actions/workflows/ci.yml)
+[![CI](https://github.com/GZ-Alinx/awsinfra/actions/workflows/ci.yml/badge.svg)](https://github.com/GZ-Alinx/awsinfra/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 面向 AWS/EKS 的项目化基础设施和应用交付平台。平台使用 Go 管理 Terraform、AWS CLI、kubectl 与 Helm，通过 Vue 3 + Arco Design Vue 提供项目、环境、权限、部署、日志、资源访问和 CI/CD 管理界面。
@@ -39,8 +39,8 @@ flowchart LR
 前置条件：Go 1.25.13+、Node.js 20.19+、Docker Compose v2。创建 AWS/EKS 资源时还需要 Terraform 1.9+、AWS CLI v2、kubectl 和 Helm 3+。
 
 ```console
-git clone https://github.com/GZ-Alinx/ops-deploy-platform.git
-cd ops-deploy-platform
+git clone https://github.com/GZ-Alinx/awsinfra.git
+cd awsinfra
 
 # 交互式设置管理员密码，并自动生成数据库、Redis 和凭据加密密钥。
 # 已存在 .env 时会拒绝覆盖。
@@ -107,6 +107,10 @@ go run ./cmd/platform-deploy status --config deploy/kubernetes/deploy.yaml
 - Terraform 变更前应审查保存的 Plan；销毁和高风险操作需要独立确认。
 
 公开仓库中的示例域名、账号、Bucket 和项目均为占位值。不要将真实 `.env`、`deploy.yaml`、State、日志或项目归档加入 Git。
+
+## 升级兼容性
+
+项目品牌和开源仓库名称已统一为 **AWSInfra / AWS 部署平台**。为保证现有环境能够原地升级，CLI 命令 `ops-deploy`、Kubernetes 资源名、Terraform State 标识、标签及默认运行目录继续保留 `ops-deploy` / `ops-deploy-platform` 兼容名称；请勿仅因品牌变更手工重建这些资源。
 
 ## 开发与验证
 

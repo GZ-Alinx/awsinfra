@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/cicd"
-	"ops-deploy-platform/internal/gitlab"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/gitlab"
 )
 
 const maxGitRelayRequestBytes = 8 << 20

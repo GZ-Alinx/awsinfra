@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/persistence"
-	"ops-deploy-platform/internal/statebackend"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/persistence"
+	"github.com/GZ-Alinx/awsinfra/internal/statebackend"
 )
 
 func main() {

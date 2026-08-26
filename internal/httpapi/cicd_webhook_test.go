@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"ops-deploy-platform/internal/cicd"
-	"ops-deploy-platform/internal/gitlab"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/gitlab"
 )
 
 func TestGitLabWebhookServicesMatchesOnlyRegisteredJobRepository(t *testing.T) {

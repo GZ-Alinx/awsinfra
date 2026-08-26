@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"ops-deploy-platform/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
 )
 
 func TestGeneratedPipelineFilesAreDeterministicAndSelfContained(t *testing.T) {

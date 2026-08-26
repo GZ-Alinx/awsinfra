@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/environment"
-	"ops-deploy-platform/internal/jobs"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/jobs"
 )
 
 func TestManagedTerraformResourceCount(t *testing.T) {

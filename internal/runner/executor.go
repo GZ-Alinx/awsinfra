@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"ops-deploy-platform/internal/sensitive"
+	"github.com/GZ-Alinx/awsinfra/internal/sensitive"
 )
 
 type Command struct {

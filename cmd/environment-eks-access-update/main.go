@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/environment"
-	"ops-deploy-platform/internal/persistence"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/persistence"
 )
 
 type cidrList []string

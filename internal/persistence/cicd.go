@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
 )
 
 type cicdScanner interface{ Scan(...any) error }

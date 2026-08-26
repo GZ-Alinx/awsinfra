@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"ops-deploy-platform/internal/environment"
-	"ops-deploy-platform/internal/jobs"
-	statusservice "ops-deploy-platform/internal/status"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/jobs"
+	statusservice "github.com/GZ-Alinx/awsinfra/internal/status"
 )
 
 var errNodeGroupPlanningLocked = errors.New("EKS 已创建，已有节点组受删除和结构变更保护")

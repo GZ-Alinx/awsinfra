@@ -18,13 +18,13 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/alertingrelay"
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/dataservicecredentials"
-	"ops-deploy-platform/internal/environment"
-	"ops-deploy-platform/internal/jobs"
-	"ops-deploy-platform/internal/statebackend"
-	"ops-deploy-platform/internal/tlscertificates"
+	"github.com/GZ-Alinx/awsinfra/internal/alertingrelay"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/dataservicecredentials"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/jobs"
+	"github.com/GZ-Alinx/awsinfra/internal/statebackend"
+	"github.com/GZ-Alinx/awsinfra/internal/tlscertificates"
 )
 
 type Deployment struct {

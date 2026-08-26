@@ -79,7 +79,7 @@ func Render(payload Payload, project, environment string) (string, error) {
 		statusLabel = "告警恢复"
 	}
 	var builder strings.Builder
-	_, _ = fmt.Fprintf(&builder, "运维自动部署平台 · %s\n项目：%s\n环境：%s\n告警数量：%d\n", statusLabel, project, environment, len(payload.Alerts))
+	_, _ = fmt.Fprintf(&builder, "AWS 部署平台 · %s\n项目：%s\n环境：%s\n告警数量：%d\n", statusLabel, project, environment, len(payload.Alerts))
 	limit := len(payload.Alerts)
 	if limit > 10 {
 		limit = 10

@@ -15,8 +15,8 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
-	"ops-deploy-platform/internal/environment"
-	statusservice "ops-deploy-platform/internal/status"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	statusservice "github.com/GZ-Alinx/awsinfra/internal/status"
 )
 
 func main() {

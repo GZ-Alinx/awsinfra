@@ -3,7 +3,7 @@ package kubetunnel
 import (
 	"testing"
 
-	"ops-deploy-platform/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
 )
 
 func TestValidateEndpoint(t *testing.T) {

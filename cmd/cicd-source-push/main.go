@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/gitlab"
-	"ops-deploy-platform/internal/persistence"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/gitlab"
+	"github.com/GZ-Alinx/awsinfra/internal/persistence"
 )
 
 func main() {
@@ -61,7 +61,7 @@ func main() {
 		fmt.Println("no source changes to push")
 		return
 	}
-	identity := []string{"GIT_AUTHOR_NAME=Ops Deploy Platform", "GIT_AUTHOR_EMAIL=ops-deploy@local", "GIT_COMMITTER_NAME=Ops Deploy Platform", "GIT_COMMITTER_EMAIL=ops-deploy@local"}
+	identity := []string{"GIT_AUTHOR_NAME=AWSInfra", "GIT_AUTHOR_EMAIL=ops-deploy@local", "GIT_COMMITTER_NAME=AWSInfra", "GIT_COMMITTER_EMAIL=ops-deploy@local"}
 	if commitOutput, err := output(ctx, *repositoryPath, identity, "git", "commit", "-m", strings.TrimSpace(*message)); err != nil {
 		fatal(fmt.Errorf("commit source changes: %w: %s", err, strings.TrimSpace(commitOutput)))
 	}

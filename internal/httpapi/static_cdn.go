@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"ops-deploy-platform/internal/auth"
-	"ops-deploy-platform/internal/awscredentials"
-	"ops-deploy-platform/internal/staticcdn"
+	"github.com/GZ-Alinx/awsinfra/internal/auth"
+	"github.com/GZ-Alinx/awsinfra/internal/awscredentials"
+	"github.com/GZ-Alinx/awsinfra/internal/staticcdn"
 )
 
 const maxStaticCDNProxyUploadBytes int64 = 100 << 20

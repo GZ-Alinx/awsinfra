@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/auditlog"
-	"ops-deploy-platform/internal/auth"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/auditlog"
+	"github.com/GZ-Alinx/awsinfra/internal/auth"
 )
 
 func TestListAuditEventsRequiresDedicatedPermissionAndParsesFilters(t *testing.T) {

@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/environment"
-	"ops-deploy-platform/internal/jobs"
-	statusservice "ops-deploy-platform/internal/status"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/jobs"
+	statusservice "github.com/GZ-Alinx/awsinfra/internal/status"
 )
 
 type environmentLifecycle struct {

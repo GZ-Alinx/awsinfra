@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/awscredentials"
-	"ops-deploy-platform/internal/persistence"
-	"ops-deploy-platform/internal/staticcdn"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/awscredentials"
+	"github.com/GZ-Alinx/awsinfra/internal/persistence"
+	"github.com/GZ-Alinx/awsinfra/internal/staticcdn"
 )
 
 func TestProxyUploadIntegration(t *testing.T) {

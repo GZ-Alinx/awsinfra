@@ -16,8 +16,8 @@ import (
 	"text/template"
 	"time"
 
-	"ops-deploy-platform/internal/alertingrelay"
-	"ops-deploy-platform/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/alertingrelay"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
 )
 
 const maxAlertTestResponseBytes = 64 * 1024
@@ -501,7 +501,7 @@ func renderConfiguredAlertMessage(alerting map[string]any, payload alertingrelay
 		return alertMessage{}, "", err
 	}
 	if len(payload.Alerts) == 0 {
-		return alertMessage{Title: "运维自动部署平台告警", Markdown: fallback}, "", nil
+		return alertMessage{Title: "AWS 部署平台告警", Markdown: fallback}, "", nil
 	}
 	first := payload.Alerts[0]
 	eventType := alertEventType(first)
@@ -803,7 +803,7 @@ func alertMessageColors(message alertMessage) (string, string) {
 func buildAlertTestPayload(provider string, message alertMessage) (map[string]any, error) {
 	title := truncateAlertText(message.Title, 200)
 	if title == "" {
-		title = "运维自动部署平台告警"
+		title = "AWS 部署平台告警"
 	}
 	markdown := truncateAlertText(message.Markdown, 12000)
 	if markdown == "" {

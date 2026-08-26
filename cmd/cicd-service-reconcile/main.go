@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/gitlab"
-	"ops-deploy-platform/internal/persistence"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/gitlab"
+	"github.com/GZ-Alinx/awsinfra/internal/persistence"
 )
 
 func main() {

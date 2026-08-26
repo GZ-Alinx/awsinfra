@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"ops-deploy-platform/internal/sensitive"
+	"github.com/GZ-Alinx/awsinfra/internal/sensitive"
 )
 
 type Action string
@@ -672,7 +672,7 @@ func failureDiagnosis(job *Job, message string) Diagnosis {
 		base.Code, base.Title = "platform_access_phase_contract_mismatch", "平台接入阶段与 Terraform 版本不匹配"
 		base.Cause = "平台已提交 access 接入配置动作，但当前 Terraform 模块的变量校验尚未接受 access，任务在资源计划和变更前被拒绝。"
 		base.Impact = "Terraform 没有进入资源操作，本次任务不会创建、修改或删除组件、TLS、域名、告警或云资源。"
-		base.Suggestion = "更新运维自动部署平台及其内置 Terraform 模块，确保 access 同时被变量校验和阶段二资源计算识别。"
+		base.Suggestion = "更新 AWS 部署平台及其内置 Terraform 模块，确保 access 同时被变量校验和阶段二资源计算识别。"
 		base.Retry = "平台发布包含 access 阶段契约修复的版本后，可直接使用“仅应用接入配置”重试，不需要清理 State、Helm Release 或 PVC。"
 		return base
 	case strings.Contains(text, "job log storage unavailable"),

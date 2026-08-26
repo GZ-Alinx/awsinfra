@@ -8,8 +8,8 @@
     </transition>
     <a-layout-sider class="app-sider" :width="224" :collapsed-width="56" :collapsed="collapsed" collapsible breakpoint="xl" @collapse="collapsed = $event">
       <div class="brand" :class="{ compact: collapsed }">
-        <div class="brand-logo">运</div>
-        <div v-if="!collapsed"><strong>运维自动部署平台</strong><span>AWS 基础设施管理</span></div>
+        <div class="brand-logo">A</div>
+        <div v-if="!collapsed"><strong>AWSInfra</strong><span>AWS 部署平台</span></div>
       </div>
       <a-menu aria-label="平台主导航" :selected-keys="[String(route.name)]" :default-open-keys="['project-delivery', 'platform-admin']" :style="{ width: '100%' }">
 		<a-menu-item key="projects" @click="go('projects')"><template #icon><icon-apps /></template>项目与环境</a-menu-item>
@@ -169,7 +169,7 @@ let jobPollTimer = 0;
 let jobPollBusy = false;
 const requestStarted = () => { pendingOperations.value += 1; };
 const requestEnded = () => { pendingOperations.value = Math.max(0, pendingOperations.value - 1); };
-const pageTitle = computed(() => ({ projects: '项目与环境', 'aws-connection': 'AWS 凭据池', 'terraform-state': 'Terraform 状态中心', 'gitlab-servers': 'GitLab 服务器', overview: '环境概览', observability: '应用全景观测', environment: '部署配置', ingresses: 'Ingress 管理', 'static-cdn': '静态资源 CDN', resources: '环境资源与访问', jobs: '任务与日志', cicd: 'CICD', components: '可用组件目录', users: '用户与授权', 'audit-events': '操作审计' }[String(route.name)] || '运维自动部署平台'));
+const pageTitle = computed(() => ({ projects: '项目与环境', 'aws-connection': 'AWS 凭据池', 'terraform-state': 'Terraform 状态中心', 'gitlab-servers': 'GitLab 服务器', overview: '环境概览', observability: '应用全景观测', environment: '部署配置', ingresses: 'Ingress 管理', 'static-cdn': '静态资源 CDN', resources: '环境资源与访问', jobs: '任务与日志', cicd: 'CICD', components: '可用组件目录', users: '用户与授权', 'audit-events': '操作审计' }[String(route.name)] || 'AWS 部署平台'));
 const isProductionEnvironment = computed(() => store.currentEnvironmentKey.trim().toLowerCase() === 'prod');
 const deploymentStageTab = computed(() => {
   const targetType = String(store.config?.deployment_target?.type || store.status?.cluster?.target_type || 'managed');

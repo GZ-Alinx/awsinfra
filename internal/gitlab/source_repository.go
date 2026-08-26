@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"ops-deploy-platform/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
 )
 
 var sourcePathPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$`)
@@ -481,7 +481,7 @@ func (s *Service) EnsureSourceRepository(ctx context.Context, project, serviceKe
 			return SourceRepositoryResult{}, fmt.Errorf("%w：源码仓库 %s 已存在但不属于当前项目服务，已拒绝覆盖", ErrConflict, fullPath)
 		}
 	}
-	registered := cicd.Repository{Key: repositoryKey, ProjectKey: project, DisplayName: serviceKey + " 业务源码", Provider: "gitlab", Purpose: "source", CloneURL: repository.HTTPURLToRepo, DefaultBranch: delivery.DefaultBranch, Description: "由运维自动部署平台创建，仅属于当前项目服务"}
+	registered := cicd.Repository{Key: repositoryKey, ProjectKey: project, DisplayName: serviceKey + " 业务源码", Provider: "gitlab", Purpose: "source", CloneURL: repository.HTTPURLToRepo, DefaultBranch: delivery.DefaultBranch, Description: "由 AWS 部署平台创建，仅属于当前项目服务"}
 	if err := s.store.SaveCICDRepository(ctx, registered); err != nil {
 		return SourceRepositoryResult{}, err
 	}

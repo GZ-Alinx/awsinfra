@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"ops-deploy-platform/internal/jobs"
-	statusservice "ops-deploy-platform/internal/status"
+	"github.com/GZ-Alinx/awsinfra/internal/jobs"
+	statusservice "github.com/GZ-Alinx/awsinfra/internal/status"
 )
 
 func TestDeriveEnvironmentLifecycle(t *testing.T) {

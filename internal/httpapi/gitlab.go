@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/gitlab"
-	"ops-deploy-platform/internal/sensitive"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/gitlab"
+	"github.com/GZ-Alinx/awsinfra/internal/sensitive"
 )
 
 func (s *Server) listGitLabServers(w http.ResponseWriter, r *http.Request) {

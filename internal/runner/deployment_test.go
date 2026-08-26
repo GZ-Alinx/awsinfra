@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/environment"
-	"ops-deploy-platform/internal/jobs"
-	"ops-deploy-platform/internal/statebackend"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/jobs"
+	"github.com/GZ-Alinx/awsinfra/internal/statebackend"
 )
 
 func TestTerraformInitUsesCommittedLockFileReadOnly(t *testing.T) {

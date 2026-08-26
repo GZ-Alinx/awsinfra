@@ -1,6 +1,6 @@
 # 参与贡献
 
-感谢参与 Ops Deploy Platform。提交变更代表你同意按 Apache-2.0 许可贡献代码。
+感谢参与 AWSInfra。提交变更代表你同意按 Apache-2.0 许可贡献代码。
 
 ## 开发流程
 

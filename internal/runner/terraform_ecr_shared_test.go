@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
 )
 
 func TestTerraformDoesNotOwnEnvironmentScopedECRRepositories(t *testing.T) {

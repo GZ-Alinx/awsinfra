@@ -14,13 +14,13 @@ import (
 	"strconv"
 	"strings"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/auth"
-	"ops-deploy-platform/internal/awscatalog"
-	"ops-deploy-platform/internal/cicd"
-	"ops-deploy-platform/internal/environment"
-	"ops-deploy-platform/internal/gitlab"
-	statusservice "ops-deploy-platform/internal/status"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/auth"
+	"github.com/GZ-Alinx/awsinfra/internal/awscatalog"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/gitlab"
+	statusservice "github.com/GZ-Alinx/awsinfra/internal/status"
 )
 
 func (s *Server) ensureCICDECRRepository(w http.ResponseWriter, r *http.Request) {

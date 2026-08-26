@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"ops-deploy-platform/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
 )
 
 const (
@@ -90,7 +90,7 @@ func renderServiceCatalog(services []ServiceSpec) string {
 	fmt.Fprintf(&catalog, `/*
  * 当前 Job 的服务配置
  * -----------------------------------------------------------------------------
- * 由运维自动部署平台生成，供 Jenkinsfile 和 %s 读取。
+ * 由 AWS 部署平台生成，供 Jenkinsfile 和 %s 读取。
  *
  * 配置按“源码 → 构建 → 镜像 → 部署”分组，便于人工检查。
  * 此文件只允许保存 Jenkins Credential ID，禁止填写 Token、密码等明文。
@@ -198,7 +198,7 @@ func renderJobJenkinsfile(job cicd.Job, manifestURL, manifestBranch string) stri
 	template := `/*
  * @@JOB_DISPLAY_NAME@@
  * =============================================================================
- * 由运维自动部署平台生成 · Pipeline Schema @@SCHEMA_VERSION@@
+ * 由 AWS 部署平台生成 · Pipeline Schema @@SCHEMA_VERSION@@
  *
  * 这个 Jenkinsfile 只负责流程编排，不包含业务编译逻辑：
  *   1. 检出当前流水线仓库

@@ -12,15 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"ops-deploy-platform/internal/access"
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/auditlog"
-	"ops-deploy-platform/internal/auth"
-	"ops-deploy-platform/internal/awscatalog"
-	"ops-deploy-platform/internal/cicd"
-	"ops-deploy-platform/internal/environment"
-	"ops-deploy-platform/internal/jobs"
-	statusservice "ops-deploy-platform/internal/status"
+	"github.com/GZ-Alinx/awsinfra/internal/access"
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/auditlog"
+	"github.com/GZ-Alinx/awsinfra/internal/auth"
+	"github.com/GZ-Alinx/awsinfra/internal/awscatalog"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/jobs"
+	statusservice "github.com/GZ-Alinx/awsinfra/internal/status"
 )
 
 type noOpRunner struct{}

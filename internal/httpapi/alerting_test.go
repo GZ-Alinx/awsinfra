@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"ops-deploy-platform/internal/alertingrelay"
-	"ops-deploy-platform/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/alertingrelay"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
 )
 
 func TestNormalizedAlertProviderRecognizesLarkWebhook(t *testing.T) {

@@ -283,7 +283,7 @@ spec:
                 echo "ClickHouse 数据源已经存在，无需重复创建。"
                 exit 0
               fi
-              body="$(printf '{"datasource":"ch","name":"Kubernetes 日志 ClickHouse","dsn":"clickhouse://clickvisual:%s@clickvisual-clickhouse.{{ .Values.namespace }}.svc.cluster.local:9000/logs?max_execution_time=60","desc":"运维自动部署平台自动配置"}' "$CLICKHOUSE_PASSWORD")"
+              body="$(printf '{"datasource":"ch","name":"Kubernetes 日志 ClickHouse","dsn":"clickhouse://clickvisual:%s@clickvisual-clickhouse.{{ .Values.namespace }}.svc.cluster.local:9000/logs?max_execution_time=60","desc":"AWS 部署平台自动配置"}' "$CLICKHOUSE_PASSWORD")"
               response="$(curl --silent --show-error --fail $headers -H 'Content-Type: application/json' -X POST --data "$body" "${endpoint}/api/v1/sys/instances")"
               if echo "$response" | grep -Eq '"code"[[:space:]]*:[[:space:]]*0|"success"[[:space:]]*:[[:space:]]*true'; then
                 echo "ClickVisual 已自动接入日志 ClickHouse 数据源。"

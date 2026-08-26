@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
 	"gopkg.in/yaml.v3"
-	"ops-deploy-platform/internal/appconfig"
-	"ops-deploy-platform/internal/cicd"
 )
 
 func TestProjectDeliveryUsesOneEnvironmentScopedRepository(t *testing.T) {

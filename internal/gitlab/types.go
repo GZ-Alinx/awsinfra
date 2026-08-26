@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"ops-deploy-platform/internal/cicd"
+	"github.com/GZ-Alinx/awsinfra/internal/cicd"
 )
 
 var (

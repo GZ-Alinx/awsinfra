@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"ops-deploy-platform/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
 )
 
 const cloudConfigurationSchemaVersion = 5

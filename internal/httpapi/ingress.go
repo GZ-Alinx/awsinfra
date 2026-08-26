@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"ops-deploy-platform/internal/sensitive"
-	statusservice "ops-deploy-platform/internal/status"
+	"github.com/GZ-Alinx/awsinfra/internal/sensitive"
+	statusservice "github.com/GZ-Alinx/awsinfra/internal/status"
 )
 
 type ingressWriteRequest struct {

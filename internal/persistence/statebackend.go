@@ -6,7 +6,7 @@ import (
 	"errors"
 	"os"
 
-	"ops-deploy-platform/internal/statebackend"
+	"github.com/GZ-Alinx/awsinfra/internal/statebackend"
 )
 
 func (s *Services) GetTerraformStateBackend(ctx context.Context) (statebackend.StoredConfig, error) {

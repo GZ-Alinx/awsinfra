@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"ops-deploy-platform/internal/environment"
+	"github.com/GZ-Alinx/awsinfra/internal/environment"
 )
 
 func removedNamespaceNames(current, next environment.Document) []string {

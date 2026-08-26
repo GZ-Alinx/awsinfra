@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"ops-deploy-platform/internal/projectarchive"
+	"github.com/GZ-Alinx/awsinfra/internal/projectarchive"
 )
 
 func main() {

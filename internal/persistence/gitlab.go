@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"ops-deploy-platform/internal/gitlab"
+	"github.com/GZ-Alinx/awsinfra/internal/gitlab"
 )
 
 func (s *Services) ListGitLabServers(ctx context.Context) ([]gitlab.StoredServer, error) {
