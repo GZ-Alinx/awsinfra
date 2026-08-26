@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Go, Vue and Terraform
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.15.9
+          terraform_wrapper: false
+
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci
+
+      - name: Check frontend
+        run: |
+          npm --prefix frontend run typecheck
+          npm --prefix frontend test
+          npm --prefix frontend run build
+          npm --prefix frontend audit --registry=https://registry.npmjs.org --audit-level=high
+
+      - name: Check Go formatting
+        run: test -z "$(gofmt -l cmd internal web)"
+
+      - name: Test Go
+        run: |
+          go test -race ./...
+          go vet ./...
+
+      - name: Scan Git history for secrets
+        run: go run github.com/zricethezav/gitleaks/v8@v8.30.1 git --no-banner .
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive terraform
+
+      - name: Validate infrastructure Terraform
+        run: |
+          terraform -chdir=terraform/infra init -backend=false -input=false
+          terraform -chdir=terraform/infra validate
+
+      - name: Validate platform Terraform
+        run: |
+          terraform -chdir=terraform/platform init -backend=false -input=false
+          terraform -chdir=terraform/platform validate
