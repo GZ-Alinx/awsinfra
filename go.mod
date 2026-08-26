@@ -4,7 +4,7 @@ go 1.25.13
 
 require (
 	github.com/go-sql-driver/mysql v1.10.0
-	github.com/redis/go-redis/v9 v9.21.0
+	github.com/redis/go-redis/v9 v9.22.0
 	golang.org/x/crypto v0.54.0
 	golang.org/x/term v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
