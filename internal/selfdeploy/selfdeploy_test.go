@@ -134,10 +134,12 @@ func TestBuildTLSSecretDocumentValidatesCertificateHost(t *testing.T) {
 }
 
 func TestIngressExternalOriginMustMatchHost(t *testing.T) {
-	config, err := LoadConfig(filepath.Join("..", "..", "deploy", "kubernetes", "deploy.yaml"))
+	config, err := LoadConfig(filepath.Join("..", "..", "deploy", "kubernetes", "deploy.example.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	config.Kubernetes.CookieSecure = true
+	config.Kubernetes.Ingress.Enabled = true
 	config.Kubernetes.ExternalOrigin = "https://wrong.example.com"
 	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "must exactly match") {
 		t.Fatalf("expected external origin mismatch to be rejected, got %v", err)
