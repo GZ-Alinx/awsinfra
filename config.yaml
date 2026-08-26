@@ -9,7 +9,7 @@ server:
 
 security:
   # The password itself is never stored in YAML. Generate an Argon2id hash with
-  # `ops-deploy hash-password` and export it through this environment variable.
+  # `awsinfra hash-password` and export it through this environment variable.
   admin_username: admin
   password_hash_env: OPS_DEPLOY_PASSWORD_HASH
   # 32-byte base64 key used only to encrypt project AWS credentials in MySQL.

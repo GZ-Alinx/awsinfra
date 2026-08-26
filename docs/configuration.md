@@ -22,9 +22,11 @@
 | `OPS_DEPLOY_PASSWORD_HASH` | 管理员密码 Argon2id 哈希 |
 | `OPS_DEPLOY_CREDENTIAL_KEY` | 32 字节 Base64 AES-256-GCM 主密钥 |
 | `OPS_MYSQL_DSN` | 平台 MySQL DSN |
+| `OPS_DEPLOY_REDIS_ADDRESS` | Redis `host:port`，初始化已有数据存储时自动生成 |
+| `OPS_DEPLOY_REDIS_DATABASE` | Redis Database 编号，默认 `0` |
 | `OPS_REDIS_PASSWORD` | Redis 密码 |
 
-本地可执行 `go run ./cmd/ops-deploy init --config config.yaml` 自动生成一致配置。生产 Secret 不应从示例值直接复制。
+源码运行可执行 `go run ./cmd/ops-deploy init --config config.yaml`，发行版执行 `awsinfra init --config config.yaml`。向导可以生成本地 Docker 密码，也可以填写并验证已有 MySQL/Redis。生产 Secret 不应从示例值直接复制。
 
 ## 目录和数据
 

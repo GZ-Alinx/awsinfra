@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/GZ-Alinx/awsinfra/internal/appconfig"
@@ -121,7 +120,7 @@ func (m *Manager) startLocked(ctx context.Context, key, fingerprint, kubeconfig 
 	cmd := exec.Command(m.config.Tools.Kubectl, "--kubeconfig", kubeconfig, "-n", endpoint.Namespace,
 		"port-forward", "service/"+endpoint.ServiceName, ":"+strconv.Itoa(endpoint.ServicePort), "--address", "127.0.0.1") // #nosec G204 -- executable is administrator-owned and Kubernetes names are allowlist validated.
 	cmd.Dir, cmd.Env = m.config.Paths.RepositoryRoot, commandEnvironment
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	configureTunnelProcess(cmd)
 	reader, writer := io.Pipe()
 	cmd.Stdout, cmd.Stderr = writer, writer
 	if err := cmd.Start(); err != nil {
@@ -202,7 +201,7 @@ func (m *Manager) stopLocked(current *tunnel) {
 		return
 	}
 	current.alive = false
-	if err := syscall.Kill(-current.cmd.Process.Pid, syscall.SIGTERM); err != nil {
+	if err := terminateTunnelProcess(current.cmd); err != nil {
 		_ = current.cmd.Process.Kill()
 	}
 }

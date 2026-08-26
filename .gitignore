@@ -16,6 +16,7 @@ secrets.auto.tfvars
 /data/
 /data-cicd/
 /output/
+/dist/
 /environments-cicd/
 /environments/*.yaml
 /frontend/node_modules/

@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/GZ-Alinx/awsinfra/internal/sensitive"
@@ -36,7 +35,7 @@ func (Executor) Run(ctx context.Context, command Command, output io.Writer) erro
 	cmd.Stdout = commandOutput
 	cmd.Stderr = commandOutput
 	cmd.Stdin = command.Stdin
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	configureProcessGroup(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start %s: %w", command.Name, err)
@@ -56,11 +55,11 @@ func (Executor) Run(ctx context.Context, command Command, output io.Writer) erro
 		return nil
 	case <-ctx.Done():
 		if cmd.Process != nil {
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+			_ = terminateProcessGroup(cmd, false)
 			select {
 			case <-done:
 			case <-time.After(5 * time.Second):
-				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+				_ = terminateProcessGroup(cmd, true)
 				<-done
 			}
 		}

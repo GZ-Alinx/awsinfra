@@ -172,6 +172,13 @@ func (c *Config) applyRuntimeEnvironment() error {
 	if value := strings.TrimSpace(os.Getenv("OPS_DEPLOY_REDIS_ADDRESS")); value != "" {
 		c.DataStore.Redis.Address = value
 	}
+	if value, exists := os.LookupEnv("OPS_DEPLOY_REDIS_DATABASE"); exists {
+		parsed, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil || parsed < 0 {
+			return errors.New("invalid OPS_DEPLOY_REDIS_DATABASE: expected a non-negative integer")
+		}
+		c.DataStore.Redis.Database = parsed
+	}
 	if value, exists := os.LookupEnv("OPS_DEPLOY_COOKIE_SECURE"); exists {
 		parsed, err := strconv.ParseBool(strings.TrimSpace(value))
 		if err != nil {

@@ -36,6 +36,17 @@ flowchart LR
 
 ## 五分钟本地启动
 
+不需要 Go/Node.js 的用户可直接从 [GitHub Releases](https://github.com/GZ-Alinx/awsinfra/releases) 下载对应系统安装包。安装包内已包含管理端与前端、Terraform/Helm 模板、默认配置和完整文档：
+
+```console
+./awsinfra init --config config.yaml
+./awsinfra serve --config config.yaml
+```
+
+初始化时可以选择本地 Docker MySQL/Redis，或填写已有 MySQL/Redis 的地址、端口、账号、密码和 Database。完整说明见 [发行版安装指南](docs/release-installation.md)。
+
+### 从源码启动
+
 前置条件：Go 1.25.13+、Node.js 20.19+、Docker Compose v2。创建 AWS/EKS 资源时还需要 Terraform 1.9+、AWS CLI v2、kubectl 和 Helm 3+。
 
 ```console
@@ -88,6 +99,7 @@ go run ./cmd/platform-deploy status --config deploy/kubernetes/deploy.yaml
 | 文档 | 内容 |
 |---|---|
 | [快速开始](docs/quick-start.md) | 本地初始化、启动、停止、重置 |
+| [发行版安装](docs/release-installation.md) | Windows、macOS、Linux 下载、初始化和启动 |
 | [配置参考](docs/configuration.md) | `config.yaml`、环境变量和目录 |
 | [平台部署到 EKS](docs/deploy-platform-to-eks.md) | 镜像、ECR、Secret、Ingress、升级和回滚 |
 | [AWS 权限模型](docs/aws-iam.md) | 项目身份、部署权限、最小权限建议 |

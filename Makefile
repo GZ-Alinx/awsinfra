@@ -11,8 +11,9 @@ ARCHIVE_ROOT ?= ../已部署项目归档
 NAMESPACE ?=
 RELEASE ?=
 CONFIRM ?=
+RELEASE_VERSION ?= 1.0.0
 
-.PHONY: init local docker-up docker-down frontend-install frontend-build build serve validate plan deploy platform destroy test fmt cicd-docker-up cicd-docker-down cicd-build cicd-serve platform-deploy-build platform-render platform-preflight platform-update platform-status platform-rollback archive-sync archive-plan archive-apply
+.PHONY: init local docker-up docker-down frontend-install frontend-build build serve validate plan deploy platform destroy test fmt release-package cicd-docker-up cicd-docker-down cicd-build cicd-serve platform-deploy-build platform-render platform-preflight platform-update platform-status platform-rollback archive-sync archive-plan archive-apply
 
 init:
 	go run ./cmd/ops-deploy init --config $(CONFIG)
@@ -72,6 +73,9 @@ test:
 fmt:
 	gofmt -w cmd internal web
 	terraform fmt -recursive terraform
+
+release-package:
+	go run ./cmd/release-package --version $(RELEASE_VERSION)
 
 # 平台自身的 EKS 发布工具：独立 kubeconfig，不改变本机当前 Context。
 platform-deploy-build:

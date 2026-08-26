@@ -37,7 +37,10 @@ import (
 	"github.com/GZ-Alinx/awsinfra/web"
 )
 
-const Version = "1.20.3"
+// Version is replaced at release build time through -ldflags. Source and
+// development builds keep an explicit suffix so operators can distinguish
+// them from tagged release artifacts.
+var Version = "1.0.0-dev"
 
 type Server struct {
 	config                 *appconfig.Config

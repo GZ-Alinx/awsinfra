@@ -68,13 +68,14 @@ datastore:
 	}
 	t.Setenv("OPS_DEPLOY_LISTEN_ADDRESS", "0.0.0.0:8080")
 	t.Setenv("OPS_DEPLOY_REDIS_ADDRESS", "ops-deploy-redis:6379")
+	t.Setenv("OPS_DEPLOY_REDIS_DATABASE", "4")
 	t.Setenv("OPS_DEPLOY_COOKIE_SECURE", "true")
 	t.Setenv("OPS_DEPLOY_EXTERNAL_ORIGIN", "https://ops.example.com")
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Server.ListenAddress != "0.0.0.0:8080" || cfg.DataStore.Redis.Address != "ops-deploy-redis:6379" {
+	if cfg.Server.ListenAddress != "0.0.0.0:8080" || cfg.DataStore.Redis.Address != "ops-deploy-redis:6379" || cfg.DataStore.Redis.Database != 4 {
 		t.Fatalf("runtime addresses were not applied: %#v", cfg)
 	}
 	if !cfg.Security.CookieSecure || cfg.Security.ExternalOrigin != "https://ops.example.com" {
