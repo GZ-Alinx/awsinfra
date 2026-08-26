@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: efk-elasticsearch-headless
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "efk-stack.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "efk-stack.selector" "efk-elasticsearch" | nindent 4 }}
+  ports:
+    - name: transport
+      port: 9300
+      targetPort: transport
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: efk-elasticsearch
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "efk-stack.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "efk-stack.selector" "efk-elasticsearch" | nindent 4 }}
+  ports:
+    - name: http
+      port: 9200
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: efk-elasticsearch
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "efk-stack.labels" . | nindent 4 }}
+    ops-deploy.io/component: elasticsearch
+spec:
+  serviceName: efk-elasticsearch-headless
+  replicas: 1
+  revisionHistoryLimit: 3
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: {{ ternary "Retain" "Delete" .Values.elasticsearch.storage.retainOnDelete }}
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      {{- include "efk-stack.selector" "efk-elasticsearch" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "efk-stack.selector" "efk-elasticsearch" | nindent 8 }}
+        ops-deploy.io/project: {{ .Values.project | quote }}
+        ops-deploy.io/environment: {{ .Values.environment | quote }}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: elasticsearch
+          image: {{ .Values.images.elasticsearch | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            # The official image entrypoint expects its default `eswrapper`
+            # command before any -E settings. Kubernetes `args` replaces the
+            # image CMD, so omitting this makes the entrypoint execute `-E...`
+            # as a binary and the Pod exits immediately.
+            - eswrapper
+            - -Ecluster.name={{ .Values.project }}-{{ .Values.environment }}-efk
+            - -Ediscovery.type=single-node
+            - -Expack.security.enabled=true
+            - -Expack.security.http.ssl.enabled=false
+            - -Expack.security.autoconfiguration.enabled=false
+            - -Enode.store.allow_mmap=false
+          env:
+            - name: ELASTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: efk-stack-access
+                  key: elastic-password
+            - name: ES_JAVA_OPTS
+              value: {{ .Values.elasticsearch.javaOpts | quote }}
+          ports:
+            - name: http
+              containerPort: 9200
+            - name: transport
+              containerPort: 9300
+          startupProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -ec
+                - curl -fsS -u "elastic:${ELASTIC_PASSWORD}" http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -ec
+                - curl -fsS -u "elastic:${ELASTIC_PASSWORD}" http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow
+            periodSeconds: 10
+            timeoutSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.elasticsearch.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "efk-stack.labels" . | nindent 10 }}
+          ops-deploy.io/component: elasticsearch
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: {{ .Values.elasticsearch.storage.className | quote }}
+        resources:
+          requests:
+            storage: {{ .Values.elasticsearch.storage.size | quote }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: efk-elasticsearch-internal
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "efk-stack.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "efk-stack.selector" "efk-elasticsearch" | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+        {{- range .Values.elasticsearch.allowedNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 9200
+        - protocol: TCP
+          port: 9300

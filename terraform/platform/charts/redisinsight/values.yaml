@@ -1,0 +1,45 @@
+image:
+  repository: redis/redisinsight
+  tag: "3.8.0"
+  pullPolicy: IfNotPresent
+
+proxy:
+  image:
+    repository: nginxinc/nginx-unprivileged
+    tag: "1.29.5-alpine"
+    pullPolicy: IfNotPresent
+
+service:
+  port: 80
+
+basicAuth:
+  username: admin
+  password: ""
+
+encryptionKey: ""
+
+connection:
+  redis:
+    host: ""
+    port: 6379
+    alias: Platform Redis
+    password: ""
+    tls: false
+
+persistence:
+  enabled: true
+  storageClass: gp3
+  size: 5Gi
+  retainOnDelete: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

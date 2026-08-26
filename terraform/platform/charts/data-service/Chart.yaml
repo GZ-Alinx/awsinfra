@@ -1,0 +1,6 @@
+apiVersion: v2
+name: data-service
+description: Project-scoped stateful MySQL, Redis, ActiveMQ and MongoDB deployment
+type: application
+version: 0.1.1
+appVersion: "1.0"

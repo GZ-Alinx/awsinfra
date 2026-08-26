@@ -1,0 +1,69 @@
+{{- $backend := lower .Values.storage.backend -}}
+{{- if and (eq $backend "elasticsearch") .Values.storage.elasticsearch.indexCleaner.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "jaeger-stack.name" . }}-index-cleaner
+  labels:
+    {{- include "jaeger-stack.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.storage.elasticsearch.indexCleaner.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "jaeger-stack.selector" . | nindent 12 }}
+            app.kubernetes.io/component: index-cleaner
+        spec:
+          restartPolicy: OnFailure
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: index-cleaner
+              image: "{{ .Values.storage.elasticsearch.indexCleaner.image.repository }}:{{ .Values.storage.elasticsearch.indexCleaner.image.tag }}"
+              imagePullPolicy: {{ .Values.storage.elasticsearch.indexCleaner.image.pullPolicy }}
+              args:
+                - {{ .Values.storage.elasticsearch.retentionDays | quote }}
+                - {{ .Values.storage.elasticsearch.endpoint | quote }}
+                - {{ printf "--index-prefix=%s" .Values.storage.elasticsearch.indexPrefix | quote }}
+              env:
+                - name: ES_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: jaeger-access
+                      key: elasticsearch-username
+                - name: ES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: jaeger-access
+                      key: elasticsearch-password
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

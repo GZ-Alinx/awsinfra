@@ -1,0 +1,22 @@
+name: 功能建议
+description: 建议新的云服务、组件或交付能力
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 说明项目、环境和当前工作流，不要包含真实 Secret。
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: 期望结果
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: 权限、兼容和回滚考虑

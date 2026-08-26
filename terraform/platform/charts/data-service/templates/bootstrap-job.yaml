@@ -1,0 +1,63 @@
+{{- if and (gt (int .Values.replicaCount) 1) (or (eq .Values.engine "mysql") (eq .Values.engine "redis") (eq .Values.engine "mongodb")) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "data-service.fullname" . }}-cluster-bootstrap
+  labels:
+    {{- include "data-service.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        {{- include "data-service.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: SERVICE_USERNAME
+              valueFrom: { secretKeyRef: { name: {{ include "data-service.fullname" . }}-auth, key: username } }
+            - name: SERVICE_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "data-service.fullname" . }}-auth, key: password } }
+          command: ["bash", "-ec"]
+          args:
+            - |
+              {{- if eq .Values.engine "mysql" }}
+              primary={{ include "data-service.fullname" . }}-0.{{ include "data-service.fullname" . }}-headless
+              until mysql -h "$primary" -uroot -p"$SERVICE_PASSWORD" -e 'SELECT 1'; do sleep 5; done
+              mysql -h "$primary" -uroot -p"$SERVICE_PASSWORD" -e "CREATE USER IF NOT EXISTS 'repl'@'%' IDENTIFIED BY '$SERVICE_PASSWORD'; GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%'; FLUSH PRIVILEGES;"
+              {{- range $index := until (int .Values.replicaCount) }}
+              {{- if gt $index 0 }}
+              replica={{ include "data-service.fullname" $ }}-{{ $index }}.{{ include "data-service.fullname" $ }}-headless
+              until mysql -h "$replica" -uroot -p"$SERVICE_PASSWORD" -e 'SELECT 1'; do sleep 5; done
+              mysql -h "$replica" -uroot -p"$SERVICE_PASSWORD" -e "STOP SLAVE; RESET SLAVE ALL; CHANGE MASTER TO MASTER_HOST='$primary', MASTER_USER='repl', MASTER_PASSWORD='$SERVICE_PASSWORD', MASTER_AUTO_POSITION=1; START SLAVE;"
+              {{- end }}
+              {{- end }}
+              {{- else if eq .Values.engine "redis" }}
+              nodes=""
+              {{- range $index := until (int .Values.replicaCount) }}
+              host={{ include "data-service.fullname" $ }}-{{ $index }}.{{ include "data-service.fullname" $ }}-headless
+              until redis-cli -h "$host" -a "$SERVICE_PASSWORD" ping; do sleep 3; done
+              nodes="$nodes $host:{{ $.Values.service.port }}"
+              {{- end }}
+              if ! redis-cli -h {{ include "data-service.fullname" . }}-0.{{ include "data-service.fullname" . }}-headless -a "$SERVICE_PASSWORD" cluster info 2>/dev/null | grep -q 'cluster_state:ok'; then
+                yes yes | redis-cli -a "$SERVICE_PASSWORD" --cluster create $nodes --cluster-replicas 0
+              fi
+              {{- else }}
+              primary={{ include "data-service.fullname" . }}-0.{{ include "data-service.fullname" . }}-headless
+              until (command -v mongosh >/dev/null && mongosh --host "$primary" -u "$SERVICE_USERNAME" -p "$SERVICE_PASSWORD" --authenticationDatabase admin --eval 'db.runCommand({ping:1})') || (command -v mongo >/dev/null && mongo --host "$primary" -u "$SERVICE_USERNAME" -p "$SERVICE_PASSWORD" --authenticationDatabase admin --eval 'db.runCommand({ping:1})'); do sleep 5; done
+              members='['
+              {{- range $index := until (int .Values.replicaCount) }}
+              members="$members{_id:{{ $index }},host:'{{ include "data-service.fullname" $ }}-{{ $index }}.{{ include "data-service.fullname" $ }}-headless:{{ $.Values.service.port }}'},"
+              {{- end }}
+              members="${members%,}]"
+              js="try { rs.status() } catch (e) { rs.initiate({_id:'rs0',members:$members}) }"
+              if command -v mongosh >/dev/null; then mongosh --host "$primary" -u "$SERVICE_USERNAME" -p "$SERVICE_PASSWORD" --authenticationDatabase admin --eval "$js"; else mongo --host "$primary" -u "$SERVICE_USERNAME" -p "$SERVICE_PASSWORD" --authenticationDatabase admin --eval "$js"; fi
+              {{- end }}
+{{- end }}

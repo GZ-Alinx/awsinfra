@@ -1,0 +1,196 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "data-service.fullname" . }}
+  labels:
+    {{- include "data-service.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "data-service.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: Parallel
+  {{- if .Values.storage.enabled }}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: {{ ternary "Retain" "Delete" .Values.storage.retainOnDelete }}
+    whenScaled: Retain
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "data-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "data-service.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        fsGroup: 1000
+      {{- if or (and (eq .Values.engine "mysql") .Values.storage.enabled) (and (eq .Values.engine "mongodb") (gt (int .Values.replicaCount) 1)) }}
+      initContainers:
+        {{- if and (eq .Values.engine "mysql") .Values.storage.enabled }}
+        - name: prepare-mysql-data
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-ec"]
+          args:
+            - |
+              target=/volume/mysql
+              mkdir -p "$target"
+              if find "$target" -mindepth 1 -maxdepth 1 | grep -q .; then
+                if [ ! -d "$target/mysql" ] && [ ! -f "$target/ibdata1" ]; then
+                  echo "refusing to clean a non-empty directory without MySQL data markers" >&2
+                  exit 1
+                fi
+              fi
+              chown -R 999:999 "$target"
+              chmod 0750 "$target"
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          volumeMounts:
+            - name: data
+              mountPath: /volume
+        {{- end }}
+        {{- if and (eq .Values.engine "mongodb") (gt (int .Values.replicaCount) 1) }}
+        - name: prepare-mongo-keyfile
+          image: busybox:1.36
+          command: ["sh", "-ec", "cp /source/keyfile /work/keyfile && chown 999:999 /work/keyfile && chmod 0400 /work/keyfile"]
+          volumeMounts:
+            - name: mongo-keyfile-source
+              mountPath: /source
+            - name: mongo-keyfile-work
+              mountPath: /work
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ .Values.engine }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if eq .Values.engine "mysql" }}
+          command: ["bash", "-ec"]
+          args:
+            - |
+              ordinal="${HOSTNAME##*-}"
+              exec docker-entrypoint.sh mysqld --server-id="$((ordinal + 1))" --log-bin=mysql-bin --relay-log=relay-bin --gtid-mode=ON --enforce-gtid-consistency=ON --log-slave-updates=ON --max-connections={{ .Values.settings.maxConnections }}
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "data-service.fullname" . }}-auth, key: password } }
+            - name: MYSQL_ROOT_HOST
+              value: "%"
+            - name: MYSQL_DATABASE
+              value: {{ .Values.auth.database | quote }}
+          {{- else if eq .Values.engine "redis" }}
+          command: ["redis-server"]
+          args:
+            - --appendonly
+            - {{ ternary "yes" "no" .Values.settings.appendOnly | quote }}
+            - --requirepass
+            - $(SERVICE_PASSWORD)
+            - --masterauth
+            - $(SERVICE_PASSWORD)
+            {{- if gt (int .Values.replicaCount) 1 }}
+            - --cluster-enabled
+            - "yes"
+            - --cluster-config-file
+            - /data/nodes.conf
+            - --cluster-node-timeout
+            - {{ .Values.settings.clusterNodeTimeoutMs | quote }}
+            {{- end }}
+          env:
+            - name: SERVICE_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "data-service.fullname" . }}-auth, key: password } }
+          {{- else if eq .Values.engine "mongodb" }}
+          args:
+            - --bind_ip_all
+            - --auth
+            {{- if gt (int .Values.replicaCount) 1 }}
+            - --replSet
+            - rs0
+            - --keyFile
+            - /etc/mongo-keyfile/keyfile
+            {{- end }}
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom: { secretKeyRef: { name: {{ include "data-service.fullname" . }}-auth, key: username } }
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "data-service.fullname" . }}-auth, key: password } }
+            - name: MONGO_INITDB_DATABASE
+              value: {{ .Values.auth.database | quote }}
+          {{- else if eq .Values.engine "activemq" }}
+          env:
+            - name: ACTIVEMQ_ADMIN_LOGIN
+              valueFrom: { secretKeyRef: { name: {{ include "data-service.fullname" . }}-auth, key: username } }
+            - name: ACTIVEMQ_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "data-service.fullname" . }}-auth, key: password } }
+            - name: ACTIVEMQ_MIN_MEMORY
+              value: "256"
+            - name: ACTIVEMQ_MAX_MEMORY
+              value: "1024"
+          {{- end }}
+          ports:
+            - name: client
+              containerPort: {{ .Values.service.targetPort }}
+          {{- if eq .Values.engine "activemq" }}
+            - name: console
+              containerPort: 8161
+          {{- end }}
+          readinessProbe:
+            tcpSocket: { port: client }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            tcpSocket: { port: client }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.storage.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.storage.mountPath }}
+              {{- if eq .Values.engine "mysql" }}
+              subPath: mysql
+              {{- end }}
+            {{- if and (eq .Values.engine "mongodb") (gt (int .Values.replicaCount) 1) }}
+            - name: mongo-keyfile-work
+              mountPath: /etc/mongo-keyfile
+              readOnly: true
+            {{- end }}
+          {{- end }}
+      {{- if and (eq .Values.engine "mongodb") (gt (int .Values.replicaCount) 1) }}
+      volumes:
+        - name: mongo-keyfile-source
+          secret:
+            secretName: {{ include "data-service.fullname" . }}-auth
+            defaultMode: 0400
+            items:
+              - key: keyfile
+                path: keyfile
+        - name: mongo-keyfile-work
+          emptyDir: {}
+      {{- end }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+  {{- if .Values.storage.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        {{- if eq .Values.engine "mysql" }}
+        annotations:
+          helm.sh/resource-policy: keep
+        labels:
+          {{- include "data-service.selectorLabels" . | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.storage.className }}
+        storageClassName: {{ .Values.storage.className }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.storage.size }}
+  {{- end }}

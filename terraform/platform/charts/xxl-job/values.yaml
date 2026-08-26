@@ -1,0 +1,38 @@
+image:
+  repository: xuxueli/xxl-job-admin
+  tag: "3.4.2"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+nodeSelector: {}
+tolerations: []
+
+admin:
+  username: admin
+  password: ""
+
+mysql:
+  image: mysql:8.4
+  password: ""
+  storage: 8Gi
+  storageClassName: gp3
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+mysqlResources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi

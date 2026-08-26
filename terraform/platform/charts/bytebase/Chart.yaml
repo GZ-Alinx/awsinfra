@@ -1,0 +1,6 @@
+apiVersion: v2
+name: bytebase
+description: Platform-managed Bytebase with automatic MySQL registration
+type: application
+version: 0.1.2
+appVersion: "3.20.1"

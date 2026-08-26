@@ -1,0 +1,3 @@
+{{- if lt (int .Values.replicaCount) 1 -}}
+{{- fail "RabbitMQ replicaCount must be at least 1" -}}
+{{- end -}}

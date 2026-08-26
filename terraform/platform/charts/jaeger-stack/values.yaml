@@ -1,0 +1,74 @@
+fullnameOverride: jaeger
+project: project
+environment: test
+
+replicaCount: 1
+
+image:
+  repository: jaegertracing/jaeger
+  tag: "2.20.0"
+  pullPolicy: IfNotPresent
+
+proxyImage:
+  repository: nginxinc/nginx-unprivileged
+  tag: "1.29.5-alpine"
+  pullPolicy: IfNotPresent
+
+authInitImage:
+  repository: httpd
+  tag: "2.4-alpine"
+  pullPolicy: IfNotPresent
+
+basicAuth:
+  enabled: true
+  username: admin
+  password: change-me
+
+storage:
+  # badger is a self-contained persistent test/small-installation backend.
+  # elasticsearch is the production option and uses the dedicated OTel ES.
+  backend: badger
+  className: gp3
+  initialSize: 20Gi
+  expandedSize: ""
+  retention: 168h
+  retainOnDelete: true
+  elasticsearch:
+    endpoint: http://otel-elasticsearch.monitoring.svc.cluster.local:9200
+    username: elastic
+    password: ""
+    indexPrefix: jaeger
+    shards: 1
+    replicas: 0
+    retentionDays: 30
+    indexCleaner:
+      enabled: true
+      schedule: "17 2 * * *"
+      image:
+        repository: cr.jaegertracing.io/jaegertracing/jaeger-es-index-cleaner
+        tag: "2.20.0"
+        pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+proxyResources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+nodeSelector: {}
+tolerations: []
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: prometheus

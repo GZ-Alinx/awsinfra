@@ -1,0 +1,38 @@
+fullnameOverride: otel-elasticsearch
+project: project
+environment: test
+
+mode: standalone
+replicas: 1
+
+image:
+  repository: docker.elastic.co/elasticsearch/elasticsearch
+  tag: "8.19.17"
+  pullPolicy: IfNotPresent
+
+auth:
+  username: elastic
+  password: ""
+
+javaOpts: -Xms1g -Xmx1g
+
+storage:
+  className: gp3
+  # StatefulSet volumeClaimTemplates are immutable after creation. Keep the
+  # original claim size here; the platform reconciles expandedSize directly
+  # onto all current and future PVCs.
+  initialSize: 50Gi
+  expandedSize: ""
+  retainOnDelete: true
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 2Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+allowedNamespaces: []
+nodeSelector: {}
+tolerations: []

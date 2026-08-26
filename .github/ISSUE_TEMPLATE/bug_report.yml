@@ -1,0 +1,39 @@
+name: Bug 报告
+description: 报告可复现的平台问题（不要提交安全漏洞或 Secret）
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 安全漏洞请按 SECURITY.md 私密报告。粘贴日志前请删除 AK/SK、Token、密码、域名和客户数据。
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      placeholder: v1.20.3 / commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: 部署方式
+      options: [本地 Docker Compose, EKS, 其他 Kubernetes, 直接运行二进制]
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为和复现步骤
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 已脱敏的日志与环境信息
+      description: 包括 AWS Region、Kubernetes/EKS/Terraform/Helm 版本和第一个实际错误。

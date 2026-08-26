@@ -1,0 +1,34 @@
+replicaCount: 1
+
+image:
+  repository: nacos/nacos-server
+  tag: v3.0.1
+  pullPolicy: IfNotPresent
+
+auth:
+  token: ""
+  identityKey: ops-platform
+  identityValue: ""
+
+service:
+  type: ClusterIP
+  apiPort: 8848
+  consolePort: 8080
+  mcpPort: 9080
+
+persistence:
+  enabled: true
+  storageClass: gp3
+  size: 5Gi
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 2Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

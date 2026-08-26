@@ -1,0 +1,40 @@
+engine: mysql
+replicaCount: 1
+
+image:
+  repository: mysql
+  tag: "5.7"
+  pullPolicy: IfNotPresent
+
+service:
+  port: 3306
+  targetPort: 3306
+
+auth:
+  username: root
+  password: ""
+  database: app
+
+storage:
+  enabled: true
+  className: gp3
+  size: 20Gi
+  mountPath: /var/lib/mysql
+  retainOnDelete: true
+
+settings:
+  maxConnections: 500
+  appendOnly: true
+  clusterNodeTimeoutMs: 5000
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

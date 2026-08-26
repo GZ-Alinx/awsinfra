@@ -1,0 +1,191 @@
+{{- $namespace := .Values.namespace -}}
+{{- $defaultClaim := "clickvisual-clickhouse-data" -}}
+{{- $activeClaim := .Values.clickhouse.storage.activeClaim | default $defaultClaim -}}
+{{- if eq $activeClaim $defaultClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $defaultClaim }}
+  namespace: {{ $namespace }}
+  {{- if .Values.storage.retainOnDelete }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+    ops-deploy.io/component: clickhouse
+    ops-deploy.io/workload-kind: statefulset
+    ops-deploy.io/workload-name: clickvisual-clickhouse
+    ops-deploy.io/volume-name: data
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: {{ .Values.clickhouse.storage.className | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.clickhouse.storage.size }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickvisual-clickhouse-init
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+data:
+  10-kubernetes-logs.sh: |
+    #!/bin/sh
+    set -eu
+    clickhouse-client --host 127.0.0.1 --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --multiquery <<'SQL'
+    CREATE DATABASE IF NOT EXISTS logs;
+    CREATE TABLE IF NOT EXISTS logs.kubernetes_logs
+    (
+      timestamp DateTime64(3),
+      project LowCardinality(String),
+      environment LowCardinality(String),
+      namespace LowCardinality(String),
+      pod String,
+      container LowCardinality(String),
+      node LowCardinality(String),
+      stream LowCardinality(String),
+      log String
+    )
+    ENGINE = MergeTree
+    PARTITION BY toDate(timestamp)
+    ORDER BY (project, environment, namespace, container, timestamp)
+    TTL toDateTime(timestamp) + INTERVAL {{ int .Values.clickhouse.retentionDays }} DAY DELETE;
+
+    CREATE TABLE IF NOT EXISTS logs.kubernetes_logs_queue
+    (
+      message String
+    )
+    ENGINE = Kafka
+    SETTINGS
+      kafka_broker_list = 'clickvisual-kafka.{{ .Values.namespace }}.svc.cluster.local:9092',
+      kafka_topic_list = 'kubernetes-logs',
+      kafka_group_name = 'clickvisual-clickhouse',
+      kafka_format = 'JSONAsString',
+      kafka_num_consumers = {{ min (int .Values.kafka.partitions) 4 }},
+      kafka_skip_broken_messages = 100;
+
+    CREATE MATERIALIZED VIEW IF NOT EXISTS logs.kubernetes_logs_consumer
+    TO logs.kubernetes_logs
+    AS SELECT
+      now64(3) AS timestamp,
+      JSONExtractString(message, 'project') AS project,
+      JSONExtractString(message, 'environment') AS environment,
+      JSONExtractString(message, 'kubernetes', 'namespace_name') AS namespace,
+      JSONExtractString(message, 'kubernetes', 'pod_name') AS pod,
+      JSONExtractString(message, 'kubernetes', 'container_name') AS container,
+      JSONExtractString(message, 'kubernetes', 'host') AS node,
+      JSONExtractString(message, 'stream') AS stream,
+      JSONExtractString(message, 'log') AS log
+    FROM logs.kubernetes_logs_queue;
+    SQL
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: clickvisual-clickhouse
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+    ops-deploy.io/component: clickhouse
+spec:
+  serviceName: clickvisual-clickhouse
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "clickvisual-stack.selector" "clickhouse" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "clickvisual-stack.selector" "clickhouse" | nindent 8 }}
+        ops-deploy.io/project: {{ .Values.project | quote }}
+        ops-deploy.io/environment: {{ .Values.environment | quote }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        fsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: clickhouse
+          image: {{ .Values.images.clickhouse | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: CLICKHOUSE_DB, value: logs}
+            - {name: CLICKHOUSE_USER, valueFrom: {secretKeyRef: {name: clickvisual-clickhouse-auth, key: username}}}
+            - {name: CLICKHOUSE_PASSWORD, valueFrom: {secretKeyRef: {name: clickvisual-clickhouse-auth, key: password}}}
+            - {name: CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT, value: "1"}
+          ports:
+            - {name: http, containerPort: 8123}
+            - {name: native, containerPort: 9000}
+          startupProbe:
+            httpGet: {path: /ping, port: http}
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /ping, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /ping, port: http}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.clickhouse.resources | nindent 12 }}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/clickhouse}
+            - {name: init, mountPath: /docker-entrypoint-initdb.d}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $activeClaim }}
+        - name: init
+          configMap:
+            name: clickvisual-clickhouse-init
+            defaultMode: 0555
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickvisual-clickhouse
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "clickvisual-stack.selector" "clickhouse" | nindent 4 }}
+  ports:
+    - {name: http, port: 8123, targetPort: http}
+    - {name: native, port: 9000, targetPort: native}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clickvisual-clickhouse
+  namespace: {{ $namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "clickvisual-stack.selector" "clickhouse" | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "clickvisual-stack.selector" "clickvisual" | nindent 14 }}
+      ports:
+        - {protocol: TCP, port: 8123}
+        - {protocol: TCP, port: 9000}

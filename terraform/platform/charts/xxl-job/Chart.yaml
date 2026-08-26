@@ -1,0 +1,6 @@
+apiVersion: v2
+name: xxl-job
+description: Built-in secure XXL-JOB Admin deployment with an isolated MySQL database
+type: application
+version: 0.1.0
+appVersion: "3.4.2"

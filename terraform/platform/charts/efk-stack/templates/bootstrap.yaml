@@ -1,0 +1,108 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: efk-bootstrap-{{ include "efk-stack.bootstrapHash" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "efk-stack.labels" . | nindent 4 }}
+    ops-deploy.io/component: bootstrap
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 1200
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        {{- include "efk-stack.selector" "efk-bootstrap" | nindent 8 }}
+        ops-deploy.io/project: {{ .Values.project | quote }}
+        ops-deploy.io/environment: {{ .Values.environment | quote }}
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: bootstrap
+          image: {{ .Values.images.curl | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ELASTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: efk-stack-access
+                  key: elastic-password
+            - name: KIBANA_SYSTEM_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: efk-stack-access
+                  key: kibana-system-password
+            - name: FLUENTD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: efk-stack-access
+                  key: fluentd-password
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              es="http://efk-elasticsearch.{{ .Values.namespace }}.svc.cluster.local:9200"
+              kibana="http://efk-kibana.{{ .Values.namespace }}.svc.cluster.local:5601"
+              auth="elastic:${ELASTIC_PASSWORD}"
+
+              echo "等待 Elasticsearch 就绪..."
+              until curl -fsS -u "$auth" "$es/_cluster/health?wait_for_status=yellow" >/dev/null; do sleep 5; done
+
+              echo "配置 Kibana 系统账号和 Fluentd 最小写入权限..."
+              curl -fsS -u "$auth" -X POST "$es/_security/user/kibana_system/_password" \
+                -H 'Content-Type: application/json' \
+                --data "{\"password\":\"${KIBANA_SYSTEM_PASSWORD}\"}" >/dev/null
+              curl -fsS -u "$auth" -X PUT "$es/_security/role/fluentd_writer" \
+                -H 'Content-Type: application/json' \
+                --data '{"cluster":["monitor","manage_index_templates","manage_ilm"],"indices":[{"names":["{{ include "efk-stack.indexPrefix" . }}-*"],"privileges":["auto_configure","create_index","create","index","write","manage_ilm"]}]}' >/dev/null
+              curl -fsS -u "$auth" -X PUT "$es/_security/user/fluentd_writer" \
+                -H 'Content-Type: application/json' \
+                --data "{\"password\":\"${FLUENTD_PASSWORD}\",\"roles\":[\"fluentd_writer\"],\"full_name\":\"EFK Fluentd writer\"}" >/dev/null
+
+              echo "配置 {{ .Values.elasticsearch.retentionDays }} 天日志保留策略..."
+              curl -fsS -u "$auth" -X PUT "$es/_ilm/policy/{{ include "efk-stack.indexPrefix" . }}-retention" \
+                -H 'Content-Type: application/json' \
+                --data '{"policy":{"phases":{"hot":{"actions":{}},"delete":{"min_age":"{{ .Values.elasticsearch.retentionDays }}d","actions":{"delete":{}}}}}}' >/dev/null
+              curl -fsS -u "$auth" -X PUT "$es/_index_template/{{ include "efk-stack.indexPrefix" . }}" \
+                -H 'Content-Type: application/json' \
+                --data '{"index_patterns":["{{ include "efk-stack.indexPrefix" . }}-*"],"priority":200,"template":{"settings":{"index.lifecycle.name":"{{ include "efk-stack.indexPrefix" . }}-retention","index.number_of_shards":1,"index.number_of_replicas":0}}}' >/dev/null
+
+              echo "等待 Kibana 连接 Elasticsearch..."
+              until curl -fsS -u "$auth" "$kibana/api/status" >/dev/null; do sleep 5; done
+
+              echo "创建项目默认日志视图..."
+              curl -fsS -u "$auth" -X POST "$kibana/api/data_views/data_view" \
+                -H 'kbn-xsrf: true' \
+                -H 'Content-Type: application/json' \
+                --data '{"data_view":{"id":"ops-deploy-kubernetes-logs","name":"Kubernetes 日志","title":"{{ include "efk-stack.indexPrefix" . }}-*","timeFieldName":"@timestamp","allowNoIndex":true},"override":true}' >/dev/null
+              echo "EFK 自动对接完成"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

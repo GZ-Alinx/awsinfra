@@ -1,0 +1,158 @@
+{{- $backend := lower .Values.storage.backend -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "jaeger-stack.name" . }}
+  labels:
+    {{- include "jaeger-stack.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "jaeger-stack.name" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: Parallel
+  {{- if eq $backend "badger" }}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: {{ ternary "Retain" "Delete" .Values.storage.retainOnDelete }}
+    whenScaled: Retain
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "jaeger-stack.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "jaeger-stack.labels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.basicAuth.enabled }}
+      initContainers:
+        - name: create-ui-auth
+          image: "{{ .Values.authInitImage.repository }}:{{ .Values.authInitImage.tag }}"
+          imagePullPolicy: {{ .Values.authInitImage.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - /usr/local/apache2/bin/htpasswd -Bbc /auth/.htpasswd "$JAEGER_USERNAME" "$JAEGER_PASSWORD";
+          env:
+            - name: JAEGER_USERNAME
+              valueFrom:
+                secretKeyRef: {name: jaeger-access, key: username}
+            - name: JAEGER_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: jaeger-access, key: password}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: ui-auth, mountPath: /auth}
+      {{- end }}
+      containers:
+        - name: jaeger
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["--config", "/etc/jaeger/jaeger.yaml"]
+          env:
+            {{- if eq $backend "elasticsearch" }}
+            - {name: ELASTICSEARCH_ENDPOINT, value: {{ .Values.storage.elasticsearch.endpoint | quote }}}
+            - name: ELASTICSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef: {name: jaeger-access, key: elasticsearch-username}
+            - name: ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: jaeger-access, key: elasticsearch-password}
+            {{- end }}
+          ports:
+            - {name: ui, containerPort: 16686}
+            - {name: otlp-grpc, containerPort: 4317}
+            - {name: otlp-http, containerPort: 4318}
+            - {name: health, containerPort: 13133}
+            - {name: metrics, containerPort: 8888}
+          readinessProbe:
+            httpGet: {path: /status, port: health}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /status, port: health}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: config, mountPath: /etc/jaeger, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+            {{- if eq $backend "badger" }}
+            - {name: trace-storage, mountPath: /var/lib/jaeger}
+            {{- end }}
+        - name: authenticated-ui
+          image: "{{ .Values.proxyImage.repository }}:{{ .Values.proxyImage.tag }}"
+          imagePullPolicy: {{ .Values.proxyImage.pullPolicy }}
+          ports:
+            - {name: web, containerPort: 8080}
+          readinessProbe:
+            tcpSocket: {port: web}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.proxyResources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: proxy-config, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf, readOnly: true}
+            - {name: ui-auth, mountPath: /etc/nginx/auth, readOnly: true}
+            - {name: nginx-cache, mountPath: /var/cache/nginx}
+            - {name: nginx-run, mountPath: /var/run}
+            - {name: nginx-tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "jaeger-stack.name" . }}-config
+        - name: proxy-config
+          configMap:
+            name: {{ include "jaeger-stack.name" . }}-proxy
+        - {name: ui-auth, emptyDir: {}}
+        - {name: tmp, emptyDir: {}}
+        - {name: nginx-cache, emptyDir: {}}
+        - {name: nginx-run, emptyDir: {}}
+        - {name: nginx-tmp, emptyDir: {}}
+  {{- if eq $backend "badger" }}
+  volumeClaimTemplates:
+    - metadata:
+        name: trace-storage
+        labels:
+          {{- include "jaeger-stack.labels" . | nindent 10 }}
+          ops-deploy.io/component: jaeger
+          ops-deploy.io/workload-kind: statefulset
+          ops-deploy.io/workload-name: {{ include "jaeger-stack.name" . }}
+          ops-deploy.io/volume-name: trace-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.storage.className }}
+        resources:
+          requests:
+            storage: {{ default .Values.storage.initialSize .Values.storage.expandedSize }}
+  {{- end }}

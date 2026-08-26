@@ -1,0 +1,72 @@
+fullnameOverride: opentelemetry-collector
+project: project
+environment: test
+clusterName: cluster
+
+replicaCount: 1
+image:
+  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib
+  tag: "0.158.0"
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+storage:
+  enabled: true
+  className: gp3
+  initialSize: 10Gi
+  expandedSize: ""
+  queueSize: 1000
+  retainOnDelete: true
+
+destinations:
+  jaeger:
+    enabled: true
+    endpoint: jaeger.monitoring.svc.cluster.local:4317
+  tempo:
+    enabled: false
+    endpoint: tempo.monitoring.svc.cluster.local:4317
+  prometheus:
+    enabled: true
+  loki:
+    enabled: true
+    endpoint: http://loki-gateway.monitoring.svc.cluster.local/otlp
+  elasticsearch:
+    enabled: false
+    endpoint: http://otel-elasticsearch.monitoring.svc.cluster.local:9200
+    secretName: otel-elasticsearch-access
+    usernameKey: username
+    passwordKey: password
+
+agent:
+  enabled: true
+  logs:
+    enabled: true
+    includeNamespaces: []
+    excludeNamespaces:
+      - monitoring
+    includeServices: []
+    excludeServices: []
+  metrics:
+    enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+nodeSelector: {}
+tolerations: []
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: prometheus

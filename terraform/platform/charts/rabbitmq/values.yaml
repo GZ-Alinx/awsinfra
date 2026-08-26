@@ -1,0 +1,42 @@
+replicaCount: 1
+nodeSelector: {}
+tolerations: []
+
+image:
+  repository: rabbitmq
+  tag: 4.1.8-management
+  pullPolicy: IfNotPresent
+
+auth:
+  username: user
+  password: ""
+  erlangCookie: ""
+
+service:
+  amqpPort: 5672
+  managementPort: 15672
+  metricsPort: 15692
+
+cluster:
+  # Quorum queues replicate data between RabbitMQ nodes and are the safer
+  # default for a production cluster. Applications can still explicitly
+  # declare another queue type when required.
+  defaultQueueType: quorum
+  partitionHandling: pause_minority
+
+persistence:
+  enabled: true
+  storageClass: gp3
+  size: 8Gi
+  retainOnDelete: true
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+podDisruptionBudget:
+  enabled: true

@@ -1,0 +1,22 @@
+[Unit]
+Description=运维自动部署平台
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ops-deploy
+Group=ops-deploy
+WorkingDirectory=/opt/ops-deploy-platform
+EnvironmentFile=/etc/ops-deploy.env
+ExecStart=/opt/ops-deploy-platform/bin/ops-deploy serve --config /opt/ops-deploy-platform/config.yaml
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ops-deploy-platform/data /opt/ops-deploy-platform/environments /opt/ops-deploy-platform/terraform
+
+[Install]
+WantedBy=multi-user.target

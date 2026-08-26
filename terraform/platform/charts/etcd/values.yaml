@@ -1,0 +1,50 @@
+replicaCount: 3
+image: quay.io/coreos/etcd:v3.6.11
+imagePullPolicy: IfNotPresent
+tlsSecretName: etcd-tls
+tls:
+  # Controls the client endpoint only. Peer traffic always keeps mTLS enabled.
+  enabled: false
+
+storage:
+  className: gp3
+  size: 20Gi
+  retainOnDelete: true
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+nodeSelector:
+  workload-class: platform
+tolerations: []
+
+webUI:
+  enabled: true
+  username: admin
+  password: ""
+  frontendImage: ghcr.io/etcdfinder/etcdfinder-ui:latest
+  backendImage: ghcr.io/etcdfinder/etcdfinder:latest
+  searchImage: getmeili/meilisearch:v1.15.2@sha256:fe500cf9cca05cb9f027981583f28eccf17d35d94499c1f8b7b844e7418152fc
+  grpcProxyImage: envoyproxy/envoy:distroless-v1.38.0@sha256:a7a56545102f7a682e0cafea2c9b8448af1b09ebb710eab688dfb931e3ec7ff6
+  authProxyImage: nginx:1.28.0-alpine@sha256:30f1c0d78e0ad60901648be663a710bdadf19e4c10ac6782c235200619158284
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  searchResources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  searchMaxIndexingMemory: 256Mb
+  searchMaxIndexingThreads: 1

@@ -1,0 +1,8 @@
+projects:
+  - key: example-project
+    display_name: Example Project
+    environments:
+      - key: test
+        context: ops/example-project/test
+      - key: prod
+        context: ops/example-project/prod

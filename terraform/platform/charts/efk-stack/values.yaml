@@ -1,0 +1,61 @@
+project: project
+environment: test
+namespace: project-test-efk-system
+nodeSelector: {}
+tolerations: []
+
+images:
+  elasticsearch: docker.elastic.co/elasticsearch/elasticsearch:8.19.17
+  fluentd: fluent/fluentd-kubernetes-daemonset:v1.19.3-debian-elasticsearch8-1.1@sha256:88da01d42636bb6f659f4116d66cafe44f7ee2436ddbd5c3b8bd595449f2a639
+  kibana: docker.elastic.co/kibana/kibana:8.19.17
+  curl: curlimages/curl:8.17.0
+
+secrets:
+  elasticPassword: ""
+  kibanaSystemPassword: ""
+  fluentdPassword: ""
+  securityEncryptionKey: ""
+  savedObjectsEncryptionKey: ""
+  reportingEncryptionKey: ""
+
+collection:
+  includeNamespaces: []
+  excludeNamespaces: []
+  includeServices: []
+  excludeServices: []
+
+elasticsearch:
+  retentionDays: 7
+  javaOpts: -Xms1g -Xmx1g
+  allowedNamespaces:
+    - monitoring
+  storage:
+    className: gp3
+    size: 100Gi
+    retainOnDelete: true
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+fluentd:
+  bufferSize: 2g
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+kibana:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi

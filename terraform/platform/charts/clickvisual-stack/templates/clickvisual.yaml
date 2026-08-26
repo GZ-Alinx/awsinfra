@@ -1,0 +1,352 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickvisual-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  default.toml: |
+    [app]
+    isMultiCopy = false
+    v2Edition = "full"
+    secretKey = {{ required "secrets.secretKey is required" .Values.secrets.secretKey | quote }}
+    encryptionKey = {{ required "secrets.encryptionKey is required" .Values.secrets.encryptionKey | quote }}
+    rootURL = {{ .Values.clickvisual.rootURL | quote }}
+    baseURL = "/api/admin/login/"
+    permissionFile = "./config/resource.yaml"
+
+    [casbin.rule]
+    path = "./config/rbac.conf"
+
+    [server.http]
+    host = "0.0.0.0"
+    port = 19001
+    embedPath = "dist"
+    maxAge = 86400
+
+    [server.governor]
+    host = "0.0.0.0"
+    port = 19011
+
+    [logger]
+    level = "info"
+    writer = "stderr"
+    name = "clickvisual.log"
+
+    [metadata]
+    driver = "mysql"
+    debug = false
+
+    [mysql]
+    debug = false
+    dsn = {{ printf "clickvisual:%s@tcp(clickvisual-mysql.%s.svc.cluster.local:3306)/clickvisual?charset=utf8mb4&collation=utf8mb4_general_ci&parseTime=True&loc=Local&readTimeout=5s&timeout=5s&writeTimeout=10s" .Values.secrets.mysqlPassword .Values.namespace | quote }}
+    level = "error"
+    maxIdleConns = 10
+    maxOpenConns = 50
+    connMaxLifetime = "300s"
+    attachRetryInterval = "5s"
+
+    [auth]
+    mode = "memstore"
+    name = "clickvisual_session"
+    debug = false
+    Keypairs = {{ .Values.secrets.secretKey | quote }}
+
+    [auth.anonymous]
+    enabled = false
+
+    [auth.proxy]
+    enabled = true
+    isAutoLogin = true
+    headerName = "X-CLICKVISUAL-USER"
+    headerNickName = "X-CLICKVISUAL-NICKNAME"
+    rootTokenKey = "X-CLICKVISUAL-TOKEN"
+    rootTokenValue = {{ .Values.secrets.proxyToken | quote }}
+
+    [defaultCh]
+    dsn = {{ printf "clickhouse://clickvisual:%s@clickvisual-clickhouse.%s.svc.cluster.local:9000/logs?max_execution_time=60" .Values.secrets.clickhousePassword .Values.namespace | quote }}
+  default.conf: |
+    server {
+      listen 8080;
+      server_name _;
+
+      auth_basic "ClickVisual";
+      auth_basic_user_file /etc/nginx/auth/htpasswd;
+
+      location = /healthz {
+        auth_basic off;
+        access_log off;
+        return 200 "ok\n";
+      }
+
+      location / {
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-CLICKVISUAL-USER clickvisual;
+        proxy_set_header X-CLICKVISUAL-NICKNAME "Platform Operator";
+        proxy_set_header X-CLICKVISUAL-TOKEN {{ .Values.secrets.proxyToken | quote }};
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300s;
+        proxy_pass http://127.0.0.1:19001;
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickvisual
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+    ops-deploy.io/component: clickvisual
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "clickvisual-stack.selector" "clickvisual" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "clickvisual-stack.selector" "clickvisual" | nindent 8 }}
+        ops-deploy.io/project: {{ .Values.project | quote }}
+        ops-deploy.io/environment: {{ .Values.environment | quote }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: clickvisual
+          image: {{ .Values.images.clickvisual | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-ec", "./bin/clickvisual server"]
+          env:
+            - {name: EGO_CONFIG_PATH, value: /clickvisual/config/default.toml}
+            - {name: EGO_LOG_WRITER, value: stderr}
+          ports:
+            - {name: application, containerPort: 19001}
+          startupProbe:
+            tcpSocket: {port: application}
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: {port: application}
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: {port: application}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.clickvisual.resources | nindent 12 }}
+          volumeMounts:
+            - {name: config, mountPath: /clickvisual/config/default.toml, subPath: default.toml, readOnly: true}
+        - name: authenticated-proxy
+          image: {{ .Values.images.proxy | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+          ports:
+            - {name: http, containerPort: 8080}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          volumeMounts:
+            - {name: config, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf, readOnly: true}
+            - {name: access, mountPath: /etc/nginx/auth, readOnly: true}
+            - {name: nginx-cache, mountPath: /var/cache/nginx}
+            - {name: nginx-run, mountPath: /var/run}
+            - {name: nginx-tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          secret:
+            secretName: clickvisual-config
+        - name: access
+          secret:
+            secretName: clickvisual-stack-access
+            items:
+              - {key: htpasswd, path: htpasswd}
+        - {name: nginx-cache, emptyDir: {}}
+        - {name: nginx-run, emptyDir: {}}
+        - {name: nginx-tmp, emptyDir: {}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickvisual
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "clickvisual-stack.selector" "clickvisual" | nindent 4 }}
+  ports:
+    - {name: http, port: 80, targetPort: http}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickvisual-api
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "clickvisual-stack.selector" "clickvisual" | nindent 4 }}
+  ports:
+    - {name: api, port: 19001, targetPort: application}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clickvisual-bootstrap
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+    ops-deploy.io/component: clickvisual-bootstrap
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    helm.sh/hook-weight: "10"
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        ops-deploy.io/stack: clickvisual
+        ops-deploy.io/component: clickvisual-bootstrap
+        ops-deploy.io/project: {{ .Values.project | quote }}
+        ops-deploy.io/environment: {{ .Values.environment | quote }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bootstrap
+          image: {{ .Values.images.curl | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              endpoint="http://clickvisual-api.{{ .Values.namespace }}.svc.cluster.local:19001"
+              headers="-H X-CLICKVISUAL-USER:clickvisual -H X-CLICKVISUAL-NICKNAME:Platform-Operator -H X-CLICKVISUAL-TOKEN:${PROXY_TOKEN}"
+              until install_status="$(curl --silent --show-error --fail $headers "${endpoint}/api/v1/install")"; do
+                echo "等待 ClickVisual API 就绪..."
+                sleep 5
+              done
+              if echo "$install_status" | grep -Eq '"data"[[:space:]]*:[[:space:]]*0'; then
+                echo "首次部署：初始化 ClickVisual 元数据库..."
+                curl --silent --show-error --fail $headers \
+                  -H 'Content-Type: application/json' \
+                  -X POST --data '{}' "${endpoint}/api/v1/install" |
+                  grep -Eq '"code"[[:space:]]*:[[:space:]]*0'
+              fi
+              until curl --silent --show-error --fail $headers "${endpoint}/api/v2/base/instances" >/tmp/instances.json; do
+                echo "等待 ClickVisual API 与元数据库就绪..."
+                sleep 5
+              done
+              if grep -Eq '"name"[[:space:]]*:[[:space:]]*"Kubernetes 日志 ClickHouse"' /tmp/instances.json; then
+                echo "ClickHouse 数据源已经存在，无需重复创建。"
+                exit 0
+              fi
+              body="$(printf '{"datasource":"ch","name":"Kubernetes 日志 ClickHouse","dsn":"clickhouse://clickvisual:%s@clickvisual-clickhouse.{{ .Values.namespace }}.svc.cluster.local:9000/logs?max_execution_time=60","desc":"运维自动部署平台自动配置"}' "$CLICKHOUSE_PASSWORD")"
+              response="$(curl --silent --show-error --fail $headers -H 'Content-Type: application/json' -X POST --data "$body" "${endpoint}/api/v1/sys/instances")"
+              if echo "$response" | grep -Eq '"code"[[:space:]]*:[[:space:]]*0|"success"[[:space:]]*:[[:space:]]*true'; then
+                echo "ClickVisual 已自动接入日志 ClickHouse 数据源。"
+                exit 0
+              fi
+              # Newer ClickVisual releases JSON-escape non-ASCII datasource
+              # names in the list response. In that case the human-readable
+              # name cannot be matched reliably, while the create endpoint is
+              # still authoritative and explicitly reports the duplicate.
+              if echo "$response" | grep -Fq 'data source configuration with duplicate name'; then
+                echo "ClickHouse 数据源已经存在，无需重复创建。"
+                exit 0
+              fi
+              # ClickVisual may create the datasource successfully but return a
+              # duplicate/application-level response when a previous hook run
+              # was interrupted. Read the authoritative list before failing so
+              # retries and Helm upgrades remain idempotent.
+              if curl --silent --show-error --fail $headers "${endpoint}/api/v2/base/instances" >/tmp/instances.json && \
+                 grep -Eq '"name"[[:space:]]*:[[:space:]]*"Kubernetes 日志 ClickHouse"' /tmp/instances.json; then
+                echo "ClickHouse 数据源已由并发或先前任务创建，回读确认成功。"
+                exit 0
+              fi
+              echo "创建 ClickHouse 数据源失败：ClickVisual API 未返回成功，回读也未发现目标数据源。" >&2
+              exit 1
+          env:
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: clickvisual-stack-access, key: clickhouse-password}
+            - name: PROXY_TOKEN
+              valueFrom:
+                secretKeyRef: {name: clickvisual-stack-access, key: proxy-token}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 100
+            runAsGroup: 101
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 250m, memory: 128Mi}
+      volumes:
+        - {name: tmp, emptyDir: {}}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clickvisual
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "clickvisual-stack.selector" "clickvisual" | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - {protocol: TCP, port: 8080}
+    - from:
+        - podSelector:
+            matchLabels:
+              ops-deploy.io/component: clickvisual-bootstrap
+      ports:
+        - {protocol: TCP, port: 19001}

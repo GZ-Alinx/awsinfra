@@ -1,0 +1,39 @@
+name: ops-deploy-platform
+
+services:
+  mysql:
+    image: mysql:8.4@sha256:c831a0f11348d402b43d77453e17d770be2eef356615a2823fe0f5a0d6c8b9af
+    environment:
+      MYSQL_DATABASE: ops_deploy
+      MYSQL_USER: ops
+      MYSQL_PASSWORD: ${OPS_MYSQL_PASSWORD:-ops_local_password}
+      MYSQL_ROOT_PASSWORD: ${OPS_MYSQL_ROOT_PASSWORD:-ops_local_root_password}
+      TZ: Asia/Tokyo
+    ports:
+      - "127.0.0.1:13306:3306"
+    volumes:
+      - ops_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${OPS_REDIS_PASSWORD:-ops_local_redis_password}"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - ops_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${OPS_REDIS_PASSWORD:-ops_local_redis_password}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  ops_mysql_data:
+  ops_redis_data:

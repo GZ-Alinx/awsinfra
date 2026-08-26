@@ -1,0 +1,104 @@
+{{- if .Values.integration.mysql.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "bytebase.fullname" . }}-bootstrap
+  labels:
+    {{- include "bytebase.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  # MySQL auto-registration is a convenience integration. Bytebase itself is
+  # installed once its StatefulSet is ready, so this hook must not hold the
+  # whole component transaction for fifteen minutes.
+  activeDeadlineSeconds: 420
+  template:
+    metadata:
+      labels:
+        {{- include "bytebase.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bootstrap
+          image: curlimages/curl:8.16.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            runAsUser: 100
+            runAsGroup: 101
+            readOnlyRootFilesystem: true
+          env:
+            - name: BYTEBASE_URL
+              value: "http://{{ include "bytebase.fullname" . }}:{{ .Values.service.port }}"
+            - name: ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bytebase.fullname" . }}
+                  key: admin-email
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bytebase.fullname" . }}
+                  key: admin-password
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bytebase.fullname" . }}
+                  key: mysql-password
+            - name: MYSQL_HOST
+              value: {{ required "integration.mysql.host is required" .Values.integration.mysql.host | quote }}
+            - name: MYSQL_PORT
+              value: {{ .Values.integration.mysql.port | quote }}
+            - name: MYSQL_USERNAME
+              value: {{ required "integration.mysql.username is required" .Values.integration.mysql.username | quote }}
+            - name: INSTANCE_ID
+              value: {{ required "integration.mysql.instanceId is required" .Values.integration.mysql.instanceId | quote }}
+            - name: INSTANCE_TITLE
+              value: {{ .Values.integration.mysql.title | quote }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              token=""
+              attempt=1
+              while [ "$attempt" -le 36 ]; do
+                response="$(curl -fsS -X POST "$BYTEBASE_URL/v1/auth/login" -H 'Content-Type: application/json' --data "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" 2>/dev/null || true)"
+                token="$(printf '%s' "$response" | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+                if [ -n "$token" ]; then break; fi
+                response="$(curl -fsS -X POST "$BYTEBASE_URL/v1/auth/signup" -H 'Content-Type: application/json' --data "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\",\"title\":\"{{ .Values.admin.title }}\"}" 2>/dev/null || true)"
+                token="$(printf '%s' "$response" | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+                if [ -n "$token" ]; then break; fi
+                attempt=$((attempt + 1)); sleep 5
+              done
+              if [ -z "$token" ]; then
+                echo "WARN: Bytebase 已运行，但管理员自动初始化未完成；可进入 Bytebase 后手动完成初始化" >&2
+                exit 0
+              fi
+              if curl -fsS "$BYTEBASE_URL/v1/instances" -H "Authorization: Bearer $token" | grep -q "instances/$INSTANCE_ID"; then
+                echo "Bytebase 数据库实例已存在，无需重复创建"
+                exit 0
+              fi
+              payload="$(printf '{\"title\":\"%s\",\"engine\":\"MYSQL\",\"environment\":\"environments/prod\",\"activation\":false,\"dataSources\":[{\"id\":\"admin\",\"type\":\"ADMIN\",\"host\":\"%s\",\"port\":\"%s\",\"username\":\"%s\",\"password\":\"%s\"}]}' "$INSTANCE_TITLE" "$MYSQL_HOST" "$MYSQL_PORT" "$MYSQL_USERNAME" "$MYSQL_PASSWORD")"
+              attempt=1
+              while [ "$attempt" -le 36 ]; do
+                code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$BYTEBASE_URL/v1/instances?instanceId=$INSTANCE_ID" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' --data "$payload" || true)"
+                case "$code" in 200|201) echo "Bytebase 已自动接入 MySQL"; exit 0;; esac
+                if curl -fsS "$BYTEBASE_URL/v1/instances" -H "Authorization: Bearer $token" 2>/dev/null | grep -q "instances/$INSTANCE_ID"; then exit 0; fi
+                attempt=$((attempt + 1)); sleep 5
+              done
+              echo "WARN: Bytebase 已运行，但 MySQL 自动接入未完成；请检查 MySQL Pod/Service 后手动添加" >&2
+              exit 0
+{{- end }}

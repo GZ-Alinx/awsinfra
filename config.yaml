@@ -1,0 +1,436 @@
+environment_file: .env
+
+server:
+  listen_address: 127.0.0.1:8080
+  read_timeout: 30s
+  write_timeout: 120s
+  # tls_cert_file: deploy/tls/server.crt
+  # tls_key_file: deploy/tls/server.key
+
+security:
+  # The password itself is never stored in YAML. Generate an Argon2id hash with
+  # `ops-deploy hash-password` and export it through this environment variable.
+  admin_username: admin
+  password_hash_env: OPS_DEPLOY_PASSWORD_HASH
+  # 32-byte base64 key used only to encrypt project AWS credentials in MySQL.
+  credential_key_env: OPS_DEPLOY_CREDENTIAL_KEY
+  session_ttl: 8h
+  cookie_secure: false # Must be true for non-loopback/HTTPS access.
+  # 仅用于敏感信息二次认证；普通平台登录不再按失败次数锁定。
+  login_max_attempts: 5
+  login_window: 15m
+  login_lockout: 15m
+  # Keep disabled to prevent Helm repository inspection from reaching internal services.
+  allow_private_helm_repositories: false
+  # Set to the browser-facing HTTPS origin when TLS terminates at an ALB/proxy.
+  external_origin: ""
+
+paths:
+  repository_root: .
+  environments_dir: environments
+  data_dir: data
+  terraform_infra_dir: terraform/infra
+  terraform_platform_dir: terraform/platform
+  etcd_chart_dir: terraform/platform/charts/etcd
+
+tools:
+  terraform: terraform
+  aws: aws
+  kubectl: kubectl
+  helm: helm
+
+aws:
+  profile: ""
+
+# Terraform state is never tied to the local machine or the platform PVC.
+# The live central bucket and its encrypted credential are configured from
+# Platform Management / Terraform State Center. The values below are retained
+# only to discover and safely migrate the previous per-project S3 state layout.
+terraform_state:
+  enabled: true
+  region: ap-south-1
+  bucket_prefix: ops-tfstate
+  key_prefix: ops-deploy
+  auto_create: true
+
+datastore:
+  mysql:
+    dsn_env: OPS_MYSQL_DSN
+    max_open_conns: 10
+    max_idle_conns: 5
+    conn_max_lifetime: 30m
+  redis:
+    address: 127.0.0.1:6379
+    password_env: OPS_REDIS_PASSWORD
+    database: 0
+    key_prefix: ops:manager
+    # Normal page loads use the last observed cluster snapshot. Refresh and
+    # completed deployment jobs still force a live AWS/EKS collection.
+    status_ttl: 10m
+    job_state_ttl: 24h
+
+jobs:
+  max_parallel: 1
+  timeout: 3h
+  history_limit: 100
+
+# The catalog drives the component editor and status page. Adding a component
+# normally requires: Terraform/Helm implementation, one catalog entry, and an
+# environments/*.yaml configuration block.
+components:
+  - key: vpc_cni
+    hidden: true
+    display_name: Amazon VPC CNI
+    category: EKS Add-on
+    description: Assigns VPC IP addresses to Kubernetes Pods.
+    config_path: components.eks_addons.vpc_cni
+    stage: platform
+    status_type: eks_addon
+    status_name: vpc-cni
+  - key: coredns
+    hidden: true
+    display_name: CoreDNS
+    category: EKS Add-on
+    description: Kubernetes cluster DNS service.
+    config_path: components.eks_addons.coredns
+    stage: platform
+    status_type: eks_addon
+    status_name: coredns
+  - key: kube_proxy
+    hidden: true
+    display_name: kube-proxy
+    category: EKS Add-on
+    description: Kubernetes node network proxy.
+    config_path: components.eks_addons.kube_proxy
+    stage: platform
+    status_type: eks_addon
+    status_name: kube-proxy
+  - key: pod_identity_agent
+    hidden: true
+    display_name: EKS Pod Identity Agent
+    category: EKS Add-on
+    description: Provides short-lived AWS credentials to Pods.
+    config_path: components.eks_addons.pod_identity_agent
+    stage: platform
+    status_type: eks_addon
+    status_name: eks-pod-identity-agent
+  - key: ebs_csi_driver
+    hidden: true
+    display_name: EBS CSI Driver
+    category: EKS Add-on
+    description: Dynamically provisions encrypted EBS volumes.
+    config_path: components.eks_addons.ebs_csi_driver
+    stage: platform
+    status_type: eks_addon
+    status_name: aws-ebs-csi-driver
+  - key: aws_load_balancer_controller
+    hidden: true
+    display_name: AWS Load Balancer Controller
+    category: Networking
+    description: Provisions ALB and NLB resources from Kubernetes objects.
+    config_path: components.aws_load_balancer_controller.enabled
+    stage: platform
+    status_type: helm
+    status_name: aws-load-balancer-controller
+  - key: metrics_server
+    hidden: true
+    display_name: Metrics Server
+    category: Observability
+    description: Supplies Kubernetes resource metrics.
+    config_path: components.metrics_server.enabled
+    stage: platform
+    status_type: helm
+    status_name: metrics-server
+  - key: cluster_autoscaler
+    hidden: true
+    display_name: Cluster Autoscaler
+    category: Scaling
+    description: Scales EKS managed node groups based on pending Pods.
+    config_path: components.cluster_autoscaler.enabled
+    stage: platform
+    status_type: helm
+    status_name: cluster-autoscaler
+  - key: external_dns
+    hidden: true
+    display_name: ExternalDNS
+    category: Networking
+    description: Synchronizes Kubernetes endpoints to Route 53.
+    config_path: components.external_dns.enabled
+    stage: platform
+    status_type: helm
+    status_name: external-dns
+  - key: cert_manager
+    hidden: true
+    display_name: cert-manager
+    category: Security
+    description: Manages Kubernetes TLS certificate resources.
+    config_path: components.cert_manager.enabled
+    stage: platform
+    status_type: helm
+    status_name: cert-manager
+  - key: consul
+    display_name: Consul
+    category: Stateful Service
+    description: Business configuration hot reload with TLS and ACLs.
+    config_path: components.consul.enabled
+    stage: platform
+    status_type: helm
+    status_name: consul
+  - key: etcd
+    display_name: etcd
+    category: Stateful Service
+    description: Service discovery and shared core configuration.
+    config_path: components.etcd.enabled
+    stage: platform
+    status_type: helm
+    status_name: etcd
+  - key: rds
+    hidden: true
+    display_name: RDS Admin Database
+    category: Managed Data
+    description: Single-AZ management backend database.
+    config_path: data_services.rds.enabled
+    stage: infra
+    status_type: terraform
+    status_name: rds_endpoint
+  - key: aurora
+    hidden: true
+    display_name: Aurora Game Database
+    category: Managed Data
+    description: Aurora Serverless v2 writer and reader cluster.
+    config_path: data_services.aurora.enabled
+    stage: infra
+    status_type: terraform
+    status_name: aurora_writer_endpoint
+  - key: elasticache
+    hidden: true
+    display_name: ElastiCache
+    category: Managed Data
+    description: Multi-AZ Valkey/Redis cluster for active game data.
+    config_path: data_services.elasticache.enabled
+    stage: infra
+    status_type: terraform
+    status_name: elasticache_configuration_endpoint
+  - key: ecr
+    hidden: true
+    display_name: Amazon ECR
+    category: Registry
+    description: Unified immutable container image repositories.
+    config_path: ecr.enabled
+    stage: infra
+    status_type: terraform
+    status_name: ecr_repository_urls
+  - key: postgres
+    hidden: true
+    display_name: RDS PostgreSQL
+    category: Managed Data
+    description: Managed PostgreSQL database with optional Multi-AZ.
+    config_path: data_services.postgres.enabled
+    stage: infra
+    status_type: terraform
+    status_name: postgres_endpoint
+  - key: documentdb
+    hidden: true
+    display_name: Amazon DocumentDB（MongoDB 兼容）
+    category: Managed Data
+    description: MongoDB-compatible managed document database with encrypted Secrets Manager credentials.
+    config_path: data_services.documentdb.enabled
+    stage: infra
+    status_type: terraform
+    status_name: documentdb_endpoint
+  - key: msk
+    hidden: true
+    display_name: Amazon MSK
+    category: Managed Data
+    description: Provisioned or serverless managed Kafka.
+    config_path: data_services.msk.enabled
+    stage: infra
+    status_type: terraform
+    status_name: msk_bootstrap_brokers
+  - key: amazon_mq
+    hidden: true
+    display_name: Amazon MQ RabbitMQ
+    category: Managed Data
+    description: Single instance or multi-AZ RabbitMQ cluster.
+    config_path: data_services.amazon_mq.enabled
+    stage: infra
+    status_type: terraform
+    status_name: amazon_mq_endpoint
+  - key: jenkins
+    display_name: Jenkins
+    category: CICD
+    description: Pipeline automation and build workers.
+    config_path: components.catalog.jenkins.enabled
+    stage: platform
+    status_type: helm
+    status_name: jenkins
+  - key: argocd
+    display_name: Argo CD
+    category: CICD
+    description: GitOps continuous delivery and application synchronization.
+    config_path: components.catalog.argocd.enabled
+    stage: platform
+    status_type: helm
+    status_name: argocd
+  - key: tekton
+    display_name: Tekton Pipelines
+    category: CICD
+    description: Kubernetes-native pipeline engine.
+    config_path: components.catalog.tekton.enabled
+    stage: platform
+    status_type: helm
+    status_name: tekton
+  - key: gitlab
+    display_name: GitLab
+    category: CICD
+    description: Source hosting, registry and integrated CI platform.
+    config_path: components.catalog.gitlab.enabled
+    stage: platform
+    status_type: helm
+    status_name: gitlab
+  - key: nacos
+    display_name: Nacos
+    category: 配置与注册中心
+    description: Dynamic configuration and service discovery.
+    config_path: components.catalog.nacos.enabled
+    stage: platform
+    status_type: helm
+    status_name: nacos
+  - key: xxl_job
+    display_name: XXL-JOB Admin
+    category: 调度
+    description: Distributed task scheduling console.
+    config_path: components.catalog.xxl_job.enabled
+    stage: platform
+    status_type: helm
+    status_name: xxl-job
+  - key: kafka
+    display_name: Kafka（自建）
+    category: 消息队列
+    description: Self-hosted Kafka cluster on EKS.
+    config_path: components.catalog.kafka.enabled
+    stage: platform
+    status_type: helm
+    status_name: kafka
+  - key: rabbitmq
+    display_name: RabbitMQ（自建）
+    category: 消息队列
+    description: Self-hosted RabbitMQ cluster with management console.
+    config_path: components.catalog.rabbitmq.enabled
+    stage: platform
+    status_type: helm
+    status_name: rabbitmq
+  - key: bytebase
+    display_name: Bytebase 数据库管理
+    category: 数据库管理
+    description: 数据库变更、审核与查询管理；首次部署自动初始化管理员并接入本环境 MySQL。
+    config_path: components.catalog.bytebase.enabled
+    stage: platform
+    status_type: helm
+    status_name: bytebase
+  - key: redisinsight
+    display_name: RedisInsight
+    category: 数据库管理
+    description: Redis 可视化管理与调试；自动接入本环境 Redis，默认启用独立 Basic Auth。
+    config_path: components.catalog.redisinsight.enabled
+    stage: platform
+    status_type: helm
+    status_name: redisinsight
+  - key: etcd_workbench
+    display_name: Etcd Workbench
+    category: 配置与注册中心
+    description: etcd 可视化管理控制台；原生账号认证、连接配置持久化，并提供本环境 etcd 内网地址。
+    config_path: components.catalog.etcd_workbench.enabled
+    stage: platform
+    status_type: helm
+    status_name: etcd-workbench
+  - key: prometheus
+    display_name: Prometheus + Grafana
+    category: 监控
+    description: 指标、Alertmanager 与默认中文 EKS 核心监控 Dashboard；启用 Loki 时自动作为统一日志查询入口。
+    config_path: components.catalog.prometheus.enabled
+    stage: platform
+    status_type: helm
+    status_name: prometheus
+  - key: opentelemetry_collector
+    display_name: OpenTelemetry Collector
+    category: 监控
+    description: 统一接收、处理并转发 Trace、Metric 与 Log；支持单机或高可用网关，并可选独立部署单机/集群 Elasticsearch 保存 OTel 日志与 Jaeger Trace。
+    config_path: components.catalog.opentelemetry_collector.enabled
+    stage: platform
+    status_type: helm
+    status_name: opentelemetry-collector
+  - key: loki
+    display_name: Loki
+    category: 日志
+    description: 集中式日志存储；自动部署 Alloy 采集 EKS 日志、接入 Grafana 数据源并预置中文日志检索 Dashboard。
+    config_path: components.catalog.loki.enabled
+    stage: platform
+    status_type: helm
+    status_name: loki
+  - key: clickvisual_stack
+    display_name: ClickVisual 日志平台
+    category: 日志
+    description: Fluent Bit、Kafka、ClickHouse、ClickVisual 与独立 MySQL 组成的一体化日志平台；支持按 Namespace 和服务精确控制采集范围，以及子组件存储扩容和安全迁移缩容。
+    config_path: components.catalog.clickvisual_stack.enabled
+    stage: platform
+    status_type: helm
+    status_name: clickvisual-stack
+    kind: composite
+  - key: efk_stack
+    display_name: EFK 日志系统
+    category: 日志
+    description: Elasticsearch、Fluentd 与 Kibana 一体化日志系统；支持按 Namespace 和服务精确采集，自动配置索引生命周期与 Kibana 日志视图。
+    config_path: components.catalog.efk_stack.enabled
+    stage: platform
+    status_type: helm
+    status_name: efk-stack
+    kind: composite
+  - key: higress
+    display_name: Higress 网关
+    category: 网关
+    description: Gateway, Ingress and domain routing management.
+    config_path: components.catalog.higress.enabled
+    stage: platform
+    status_type: helm
+    status_name: higress
+  - key: nginx_ingress
+    display_name: F5 NGINX Ingress Controller
+    category: 网关
+    description: Maintained NGINX Ingress Controller distribution.
+    config_path: components.catalog.nginx_ingress.enabled
+    stage: platform
+    status_type: helm
+    status_name: nginx-ingress
+  - key: mysql
+    display_name: MySQL（自建）
+    category: 中间件与数据库
+    description: 支持 MySQL 5.7/8.x、EBS 持久化及单机或主从模式。
+    config_path: components.catalog.mysql.enabled
+    stage: platform
+    status_type: helm
+    status_name: mysql
+  - key: redis
+    display_name: Redis（自建）
+    category: 中间件与数据库
+    description: 支持 Redis 5.0.5/6.x/7.x、AOF 持久化及单机或 Cluster 模式。
+    config_path: components.catalog.redis.enabled
+    stage: platform
+    status_type: helm
+    status_name: redis
+  - key: activemq
+    display_name: ActiveMQ（自建）
+    category: 中间件与数据库
+    description: 支持 ActiveMQ Classic 5.14.3 等版本及单机或多 Broker 模式。
+    config_path: components.catalog.activemq.enabled
+    stage: platform
+    status_type: helm
+    status_name: activemq
+  - key: mongodb
+    display_name: MongoDB（自建）
+    category: 中间件与数据库
+    description: 支持 MongoDB 4.4–8.0、EBS 持久化及单机或 Replica Set 模式。
+    config_path: components.catalog.mongodb.enabled
+    stage: platform
+    status_type: helm
+    status_name: mongodb

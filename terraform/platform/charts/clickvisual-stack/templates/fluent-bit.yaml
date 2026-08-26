@@ -1,0 +1,221 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: clickvisual-fluent-bit
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s-%s-clickvisual-logs" .Values.project .Values.environment | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, pods]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s-%s-clickvisual-logs" .Values.project .Values.environment | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ printf "%s-%s-clickvisual-logs" .Values.project .Values.environment | trunc 63 | trimSuffix "-" }}
+subjects:
+  - kind: ServiceAccount
+    name: clickvisual-fluent-bit
+    namespace: {{ .Values.namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickvisual-fluent-bit
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush                     2
+        Grace                     30
+        Log_Level                 info
+        Daemon                    Off
+        Parsers_File              parsers.conf
+        storage.path              /var/lib/fluent-bit/storage
+        storage.sync              normal
+        storage.checksum          off
+        storage.backlog.mem_limit 100M
+
+    [INPUT]
+        Name              tail
+        Tag               kube.*
+        Path              /var/log/containers/*.log
+        multiline.parser  docker, cri
+        DB                /var/lib/fluent-bit/storage/tail.db
+        Mem_Buf_Limit     50MB
+        Skip_Long_Lines   On
+        Refresh_Interval  5
+        storage.type      filesystem
+
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Keep_Log            On
+        Labels              On
+        Annotations         Off
+    {{- if .Values.collection.includeNamespaces }}
+
+    [FILTER]
+        Name    grep
+        Match   kube.*
+        Regex   $kubernetes['namespace_name'] ^({{ join "|" .Values.collection.includeNamespaces }})$
+    {{- end }}
+    {{- if .Values.collection.excludeNamespaces }}
+
+    [FILTER]
+        Name     grep
+        Match    kube.*
+        Exclude  $kubernetes['namespace_name'] ^({{ join "|" .Values.collection.excludeNamespaces }})$
+    {{- end }}
+    {{- if .Values.collection.includeServices }}
+
+    # Service scope matches the common workload labels first and falls back to
+    # the Pod name prefix. This covers Deployments, StatefulSets and workloads
+    # whose Service name is also their application name.
+    [FILTER]
+        Name       grep
+        Match      kube.*
+        Logical_Op OR
+        Regex      $kubernetes['labels']['app.kubernetes.io/name'] ^({{ join "|" .Values.collection.includeServices }})$
+        Regex      $kubernetes['labels']['app.kubernetes.io/component'] ^({{ join "|" .Values.collection.includeServices }})$
+        Regex      $kubernetes['labels']['app'] ^({{ join "|" .Values.collection.includeServices }})$
+        Regex      $kubernetes['labels']['k8s-app'] ^({{ join "|" .Values.collection.includeServices }})$
+        Regex      $kubernetes['pod_name'] ^({{ join "|" .Values.collection.includeServices }})(-|$)
+    {{- end }}
+    {{- if .Values.collection.excludeServices }}
+
+    # Grep legacy mode applies OR semantics to multiple Exclude rules, so a
+    # match on any known application label or Pod prefix drops the record.
+    # This filter runs after the include filter; exclusion therefore wins.
+    [FILTER]
+        Name     grep
+        Match    kube.*
+        Exclude  $kubernetes['labels']['app.kubernetes.io/name'] ^({{ join "|" .Values.collection.excludeServices }})$
+        Exclude  $kubernetes['labels']['app.kubernetes.io/component'] ^({{ join "|" .Values.collection.excludeServices }})$
+        Exclude  $kubernetes['labels']['app'] ^({{ join "|" .Values.collection.excludeServices }})$
+        Exclude  $kubernetes['labels']['k8s-app'] ^({{ join "|" .Values.collection.excludeServices }})$
+        Exclude  $kubernetes['pod_name'] ^({{ join "|" .Values.collection.excludeServices }})(-|$)
+    {{- end }}
+
+    [FILTER]
+        Name    record_modifier
+        Match   kube.*
+        Record  project {{ .Values.project }}
+        Record  environment {{ .Values.environment }}
+
+    [OUTPUT]
+        Name                         kafka
+        Match                        kube.*
+        Brokers                      clickvisual-kafka.{{ .Values.namespace }}.svc.cluster.local:9092
+        Topics                       kubernetes-logs
+        Format                       json
+        Timestamp_Key                @timestamp
+        rdkafka.request.required.acks all
+        rdkafka.compression.codec     zstd
+        rdkafka.queue.buffering.max.kbytes 102400
+        Retry_Limit                  False
+
+  parsers.conf: |
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+
+    [PARSER]
+        Name        cri
+        Format      regex
+        Regex       ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<log>.*)$
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+        Time_Keep   On
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: clickvisual-fluent-bit
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "clickvisual-stack.labels" . | nindent 4 }}
+    ops-deploy.io/component: fluent-bit
+spec:
+  selector:
+    matchLabels:
+      {{- include "clickvisual-stack.selector" "fluent-bit" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "clickvisual-stack.selector" "fluent-bit" | nindent 8 }}
+        ops-deploy.io/project: {{ .Values.project | quote }}
+        ops-deploy.io/environment: {{ .Values.environment | quote }}
+    spec:
+      serviceAccountName: clickvisual-fluent-bit
+      terminationGracePeriodSeconds: 30
+      priorityClassName: system-node-critical
+      tolerations:
+        - operator: Exists
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: fluent-bit
+          image: {{ .Values.images.fluentBit | quote }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - {name: metrics, containerPort: 2020}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+            runAsUser: 0
+          readinessProbe:
+            exec:
+              command: [/fluent-bit/bin/fluent-bit, --dry-run, -c, /fluent-bit/etc/fluent-bit.conf]
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          volumeMounts:
+            - {name: config, mountPath: /fluent-bit/etc, readOnly: true}
+            - {name: container-logs, mountPath: /var/log/containers, readOnly: true}
+            - {name: pod-logs, mountPath: /var/log/pods, readOnly: true}
+            - {name: state, mountPath: /var/lib/fluent-bit}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap:
+            name: clickvisual-fluent-bit
+        - name: container-logs
+          hostPath: {path: /var/log/containers, type: Directory}
+        - name: pod-logs
+          hostPath: {path: /var/log/pods, type: Directory}
+        - name: state
+          hostPath:
+            path: {{ printf "/var/lib/ops-deploy-fluent-bit/%s-%s" .Values.project .Values.environment | quote }}
+            type: DirectoryOrCreate
+        - {name: tmp, emptyDir: {}}

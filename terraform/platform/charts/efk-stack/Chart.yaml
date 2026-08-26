@@ -1,0 +1,6 @@
+apiVersion: v2
+name: efk-stack
+description: Managed Elasticsearch, Fluentd and Kibana logging stack for EKS
+type: application
+version: 0.1.2
+appVersion: "8.19.17"

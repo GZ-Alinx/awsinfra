@@ -1,0 +1,205 @@
+{{- if .Values.agent.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opentelemetry-agent
+  labels:
+    {{- include "observability-otel.labels" . | nindent 4 }}
+    {{- include "observability-otel.agentLabels" . | nindent 4 }}
+data:
+  collector.yaml: |
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+    receivers:
+      {{- if .Values.agent.logs.enabled }}
+      filelog:
+        include:
+          {{- if .Values.agent.logs.includeServices }}
+          {{- range $service := .Values.agent.logs.includeServices }}
+          {{- if $.Values.agent.logs.includeNamespaces }}
+          {{- range $namespace := $.Values.agent.logs.includeNamespaces }}
+          - /var/log/pods/{{ $namespace }}_{{ $service }}-*_*/*/*.log
+          {{- end }}
+          {{- else }}
+          - /var/log/pods/*_{{ $service }}-*_*/*/*.log
+          {{- end }}
+          {{- end }}
+          {{- else if .Values.agent.logs.includeNamespaces }}
+          {{- range $namespace := .Values.agent.logs.includeNamespaces }}
+          - /var/log/pods/{{ $namespace }}_*_*/*/*.log
+          {{- end }}
+          {{- else }}
+          - /var/log/pods/*/*/*.log
+          {{- end }}
+        {{- if or .Values.agent.logs.excludeNamespaces .Values.agent.logs.excludeServices }}
+        exclude:
+          {{- range $namespace := .Values.agent.logs.excludeNamespaces }}
+          - /var/log/pods/{{ $namespace }}_*_*/*/*.log
+          {{- end }}
+          {{- range $service := .Values.agent.logs.excludeServices }}
+          - /var/log/pods/*_{{ $service }}-*_*/*/*.log
+          {{- end }}
+        {{- end }}
+        start_at: end
+        include_file_path: true
+        operators:
+          - type: container
+          - type: regex_parser
+            id: kubernetes-path
+            parse_from: attributes["log.file.path"]
+            regex: '^/var/log/pods/(?P<namespace>[^_]+)_(?P<pod_name>[^_]+)_(?P<pod_uid>[^/]+)/(?P<container_name>[^/]+)/(?P<restart_count>\d+)\.log$'
+          - type: move
+            from: attributes.namespace
+            to: resource["k8s.namespace.name"]
+          - type: move
+            from: attributes.pod_name
+            to: resource["k8s.pod.name"]
+          - type: move
+            from: attributes.pod_uid
+            to: resource["k8s.pod.uid"]
+          - type: move
+            from: attributes.container_name
+            to: resource["k8s.container.name"]
+      {{- end }}
+      {{- if .Values.agent.metrics.enabled }}
+      hostmetrics:
+        root_path: /hostfs
+        collection_interval: 30s
+        scrapers:
+          cpu: {}
+          disk: {}
+          filesystem:
+            exclude_mount_points:
+              mount_points: ["/dev/*", "/proc/*", "/sys/*", "/var/lib/docker/*", "/var/lib/kubelet/*"]
+              match_type: regexp
+          load: {}
+          memory: {}
+          network: {}
+          paging: {}
+          processes: {}
+      kubeletstats:
+        collection_interval: 30s
+        auth_type: serviceAccount
+        endpoint: https://${env:K8S_NODE_NAME}:10250
+        insecure_skip_verify: true
+        metric_groups: [node, pod, container]
+      {{- end }}
+    processors:
+      memory_limiter:
+        check_interval: 5s
+        limit_percentage: 80
+        spike_limit_percentage: 25
+      k8sattributes:
+        auth_type: serviceAccount
+        passthrough: false
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.uid
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.ip
+          - sources:
+              - from: connection
+      resource/platform:
+        attributes:
+          - {key: k8s.cluster.name, value: {{ .Values.clusterName | quote }}, action: upsert}
+          - {key: deployment.environment.name, value: {{ .Values.environment | quote }}, action: upsert}
+          - {key: ops.project, value: {{ .Values.project | quote }}, action: upsert}
+      batch:
+        timeout: 5s
+        send_batch_size: 1024
+    exporters:
+      otlp/gateway:
+        endpoint: {{ printf "%s.%s.svc.cluster.local:4317" (include "observability-otel.name" .) .Release.Namespace | quote }}
+        tls:
+          insecure: true
+        sending_queue:
+          enabled: true
+          queue_size: 512
+    service:
+      extensions: [health_check]
+      pipelines:
+        {{- if .Values.agent.logs.enabled }}
+        logs:
+          receivers: [filelog]
+          processors: [memory_limiter, k8sattributes, resource/platform, batch]
+          exporters: [otlp/gateway]
+        {{- end }}
+        {{- if .Values.agent.metrics.enabled }}
+        metrics:
+          receivers: [hostmetrics, kubeletstats]
+          processors: [memory_limiter, k8sattributes, resource/platform, batch]
+          exporters: [otlp/gateway]
+        {{- end }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: opentelemetry-agent
+  labels:
+    {{- include "observability-otel.labels" . | nindent 4 }}
+    {{- include "observability-otel.agentLabels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "observability-otel.agentLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "observability-otel.labels" . | nindent 8 }}
+        {{- include "observability-otel.agentLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "observability-otel.name" . }}
+      automountServiceAccountToken: true
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/otelcol-contrib"]
+          args: ["--config=/conf/collector.yaml"]
+          env:
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: K8S_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          ports:
+            - {name: health, containerPort: 13133}
+          readinessProbe:
+            httpGet: {path: /, port: health}
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet: {path: /, port: health}
+            initialDelaySeconds: 15
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 0
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: config, mountPath: /conf, readOnly: true}
+            - {name: varlogpods, mountPath: /var/log/pods, readOnly: true}
+            - {name: hostfs, mountPath: /hostfs, readOnly: true, mountPropagation: HostToContainer}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap:
+            name: opentelemetry-agent
+        - name: varlogpods
+          hostPath:
+            path: /var/log/pods
+        - name: hostfs
+          hostPath:
+            path: /
+        - {name: tmp, emptyDir: {}}
+{{- end }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: otel-elasticsearch
+description: Dedicated Elasticsearch storage for the managed OpenTelemetry and Jaeger stack
+type: application
+version: 0.1.0
+appVersion: "8.19.17"

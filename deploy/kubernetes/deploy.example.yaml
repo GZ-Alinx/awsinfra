@@ -1,0 +1,41 @@
+cluster:
+  name: example-eks-cluster
+  region: ap-south-1
+  # Only a local AWS CLI profile name is referenced. Never store AK/SK here.
+  profile: example-admin
+  # Keep an isolated kubeconfig so the deployer never changes the user's
+  # current ~/.kube/config context.
+  kubeconfig: ../../data/kubeconfigs/ops-deploy-platform
+  context_alias: ops-deploy-platform
+
+registry:
+  repository: ops-deploy-platform
+  create_repository: true
+  tag: ""
+
+build:
+  context: ../..
+  dockerfile: Dockerfile
+  platform: linux/amd64
+
+kubernetes:
+  namespace: ops-deploy-system
+  manifest_template: ops-deploy.yaml.tmpl
+  secrets_file: secrets.env
+  storage_class: gp3
+  platform_storage: 20Gi
+  mysql_storage: 50Gi
+  redis_storage: 10Gi
+  service_type: ClusterIP
+  # Leave empty for local/port-forward access. For HTTPS, set the exact public
+  # origin and keep cookie_secure=true.
+  external_origin: ""
+  cookie_secure: false
+  ingress:
+    enabled: false
+    class_name: higress
+    host: ops.example.com
+    tls_secret_name: ops-example-com-tls
+    tls_secret_source_namespace: higress-system
+    gateway_service_namespace: higress-system
+    gateway_service_name: higress-gateway

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "xxl-job.fullname" . }}-initdb
+  labels:
+    {{- include "xxl-job.labels" . | nindent 4 }}
+data:
+  01-tables.sql: |
+{{ .Files.Get "files/tables_xxl_job.sql" | indent 4 }}
+  02-admin-password.sql: |
+    USE `xxl_job`;
+    UPDATE `xxl_job_user`
+    SET `password` = '{{ .Values.admin.password | sha256sum }}'
+    WHERE `username` = '{{ .Values.admin.username | replace "'" "''" }}';

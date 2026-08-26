@@ -1,0 +1,28 @@
+# CI/CD 功能隔离验证版。继承完整组件目录，仅覆盖端口和数据存储。
+# 它不读写当前 8080 实例的 MySQL、Redis、环境文件或日志目录。
+extends: config.yaml
+environment_file: .env.cicd
+
+server:
+  listen_address: 127.0.0.1:8081
+
+security:
+  session_cookie_name: ops_deploy_cicd_v2_session
+  password_hash_env: OPS_CICD_PASSWORD_HASH
+  credential_key_env: OPS_CICD_CREDENTIAL_KEY
+
+paths:
+  environments_dir: environments-cicd
+  data_dir: data-cicd
+
+datastore:
+  mysql:
+    dsn_env: OPS_CICD_MYSQL_DSN
+  redis:
+    address: 127.0.0.1:16379
+    password_env: OPS_CICD_REDIS_PASSWORD
+    database: 0
+    key_prefix: ops:manager:cicd-v2
+
+jobs:
+  max_parallel: 2

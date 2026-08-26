@@ -1,0 +1,12 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "hashicorp-tf-password"
+
+  [[rules.allowlists]]
+  description = "Helm value key name; the literal is not a credential"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''destinations\.elasticsearch\.passwordKey"\s*=\s*"password"''']
+  paths = ['''^terraform/platform/catalog-components\.tf$''']

@@ -1,0 +1,172 @@
+{{- $fullname := include "etcd.fullname" . -}}
+{{- $namespace := .Release.Namespace -}}
+{{- $replicas := int .Values.replicaCount -}}
+{{- $tlsEnabled := .Values.tls.enabled -}}
+{{- $clientScheme := ternary "https" "http" $tlsEnabled -}}
+{{- $peerScheme := "https" -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "etcd.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ $fullname }}-headless
+  replicas: {{ $replicas }}
+  podManagementPolicy: Parallel
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: {{ ternary "Retain" "Delete" .Values.storage.retainOnDelete }}
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      {{- include "etcd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        {{- include "etcd.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+    spec:
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  {{- include "etcd.selectorLabels" . | nindent 18 }}
+                  app.kubernetes.io/component: server
+              topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "etcd.selectorLabels" . | nindent 20 }}
+                    app.kubernetes.io/component: server
+                topologyKey: topology.kubernetes.io/zone
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              {{- include "etcd.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: server
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: etcd
+          image: {{ .Values.image | quote }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          command: ["/usr/local/bin/etcd"]
+          args:
+            - --name=$(POD_NAME)
+            - --data-dir=/var/lib/etcd
+            - --listen-client-urls={{ $clientScheme }}://0.0.0.0:2379
+            - --advertise-client-urls={{ $clientScheme }}://$(POD_NAME).{{ $fullname }}-headless.$(POD_NAMESPACE).svc.cluster.local:2379
+            - --listen-peer-urls={{ $peerScheme }}://0.0.0.0:2380
+            - --initial-advertise-peer-urls={{ $peerScheme }}://$(POD_NAME).{{ $fullname }}-headless.$(POD_NAMESPACE).svc.cluster.local:2380
+            - --initial-cluster={{- range $i := until $replicas }}{{ if $i }},{{ end }}{{ $fullname }}-{{ $i }}={{ $peerScheme }}://{{ $fullname }}-{{ $i }}.{{ $fullname }}-headless.{{ $namespace }}.svc.cluster.local:2380{{- end }}
+            - --initial-cluster-state=new
+            - --initial-cluster-token={{ .Release.Name }}-{{ .Release.Namespace }}
+            {{- if $tlsEnabled }}
+            - --cert-file=/etc/etcd/tls/tls.crt
+            - --key-file=/etc/etcd/tls/tls.key
+            - --trusted-ca-file=/etc/etcd/tls/ca.crt
+            - --client-cert-auth=true
+            {{- end }}
+            - --peer-cert-file=/etc/etcd/tls/tls.crt
+            - --peer-key-file=/etc/etcd/tls/tls.key
+            - --peer-trusted-ca-file=/etc/etcd/tls/ca.crt
+            - --peer-client-cert-auth=true
+            - --auto-compaction-mode=periodic
+            - --auto-compaction-retention=1h
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: ETCDCTL_API
+              value: "3"
+          ports:
+            - name: {{ ternary "client" "client-plain" $tlsEnabled }}
+              containerPort: 2379
+            - name: peer
+              containerPort: 2380
+          readinessProbe:
+            exec:
+              command:
+                - /usr/local/bin/etcdctl
+                - --endpoints={{ $clientScheme }}://127.0.0.1:2379
+                {{- if $tlsEnabled }}
+                - --cacert=/etc/etcd/tls/ca.crt
+                - --cert=/etc/etcd/tls/tls.crt
+                - --key=/etc/etcd/tls/tls.key
+                {{- end }}
+                - endpoint
+                - health
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - /usr/local/bin/etcdctl
+                - --endpoints={{ $clientScheme }}://127.0.0.1:2379
+                {{- if $tlsEnabled }}
+                - --cacert=/etc/etcd/tls/ca.crt
+                - --cert=/etc/etcd/tls/tls.crt
+                - --key=/etc/etcd/tls/tls.key
+                {{- end }}
+                - endpoint
+                - health
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/etcd
+            - name: tls
+              mountPath: /etc/etcd/tls
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.tlsSecretName }}
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.storage.className | quote }}
+        resources:
+          requests:
+            storage: {{ .Values.storage.size | quote }}

@@ -1,0 +1,269 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: efk-fluentd
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "efk-stack.labels" . | nindent 4 }}
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s-%s-efk-fluentd" .Values.project .Values.environment | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "efk-stack.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s-%s-efk-fluentd" .Values.project .Values.environment | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "efk-stack.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ printf "%s-%s-efk-fluentd" .Values.project .Values.environment | trunc 63 | trimSuffix "-" }}
+subjects:
+  - kind: ServiceAccount
+    name: efk-fluentd
+    namespace: {{ .Values.namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: efk-fluentd
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "efk-stack.labels" . | nindent 4 }}
+data:
+  fluent.conf: |
+    <system>
+      log_level info
+    </system>
+
+    <source>
+      @type tail
+      path /var/log/containers/*.log
+      pos_file /fluentd/state/containers.pos
+      tag kubernetes.*
+      read_from_head false
+      rotate_wait 10
+      <parse>
+        @type regexp
+        expression /^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<message>.*)$/
+        time_key time
+        time_format %Y-%m-%dT%H:%M:%S.%N%:z
+        keep_time_key true
+      </parse>
+    </source>
+
+    <filter kubernetes.**>
+      @type kubernetes_metadata
+      skip_annotations true
+    </filter>
+
+    <filter kubernetes.**>
+      @type record_transformer
+      enable_ruby true
+      <record>
+        project {{ .Values.project }}
+        environment {{ .Values.environment }}
+        service_name ${record.dig("kubernetes", "labels", "app.kubernetes.io/name") || record.dig("kubernetes", "labels", "app.kubernetes.io/component") || record.dig("kubernetes", "labels", "app") || record.dig("kubernetes", "labels", "k8s-app") || record.dig("kubernetes", "container_name") || "unknown"}
+      </record>
+    </filter>
+    {{- if .Values.collection.includeNamespaces }}
+
+    <filter kubernetes.**>
+      @type grep
+      <regexp>
+        key $.kubernetes.namespace_name
+        pattern /^(?:{{ include "efk-stack.regex" .Values.collection.includeNamespaces }})$/
+      </regexp>
+    </filter>
+    {{- end }}
+    {{- if .Values.collection.excludeNamespaces }}
+
+    <filter kubernetes.**>
+      @type grep
+      <exclude>
+        key $.kubernetes.namespace_name
+        pattern /^(?:{{ include "efk-stack.regex" .Values.collection.excludeNamespaces }})$/
+      </exclude>
+    </filter>
+    {{- end }}
+    {{- if .Values.collection.includeServices }}
+
+    <filter kubernetes.**>
+      @type grep
+      <regexp>
+        key service_name
+        pattern /^(?:{{ include "efk-stack.regex" .Values.collection.includeServices }})$/
+      </regexp>
+    </filter>
+    {{- end }}
+    {{- if .Values.collection.excludeServices }}
+
+    <filter kubernetes.**>
+      @type grep
+      <exclude>
+        key service_name
+        pattern /^(?:{{ include "efk-stack.regex" .Values.collection.excludeServices }})$/
+      </exclude>
+    </filter>
+    {{- end }}
+
+    <match kubernetes.**>
+      @type elasticsearch
+      host efk-elasticsearch.{{ .Values.namespace }}.svc.cluster.local
+      port 9200
+      scheme http
+      user fluentd_writer
+      password "#{ENV['FLUENTD_ELASTICSEARCH_PASSWORD']}"
+      logstash_format true
+      logstash_prefix {{ include "efk-stack.indexPrefix" . }}
+      include_timestamp true
+      suppress_type_name true
+      reconnect_on_error true
+      reload_on_failure true
+      request_timeout 30s
+      <buffer tag,time>
+        @type file
+        path /fluentd/buffer/elasticsearch
+        timekey 1h
+        timekey_wait 10m
+        flush_interval 5s
+        flush_thread_count 2
+        retry_forever true
+        retry_max_interval 30
+        chunk_limit_size 8m
+        total_limit_size {{ .Values.fluentd.bufferSize }}
+        overflow_action block
+      </buffer>
+    </match>
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: efk-fluentd
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "efk-stack.labels" . | nindent 4 }}
+    ops-deploy.io/component: fluentd
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "efk-stack.selector" "efk-fluentd" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "efk-stack.selector" "efk-fluentd" | nindent 8 }}
+        ops-deploy.io/project: {{ .Values.project | quote }}
+        ops-deploy.io/environment: {{ .Values.environment | quote }}
+      annotations:
+        checksum/config: {{ dict "collection" .Values.collection "project" .Values.project "environment" .Values.environment | toJson | sha256sum }}
+    spec:
+      serviceAccountName: efk-fluentd
+      terminationGracePeriodSeconds: 30
+      priorityClassName: system-node-critical
+      tolerations:
+        - operator: Exists
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Ruby 3.4 rejects a world-writable temporary directory unless it has
+        # the POSIX sticky bit. emptyDir is writable but does not guarantee the
+        # required mode, so prepare it before Fluentd starts.
+        - name: prepare-tmp
+          image: {{ .Values.images.fluentd | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - chmod 1777 /tmp
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        - name: fluentd
+          image: {{ .Values.images.fluentd | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - fluentd
+          args:
+            - -c
+            - /fluentd/etc/fluent.conf
+          env:
+            - name: FLUENTD_ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: efk-stack-access
+                  key: fluentd-password
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.fluentd.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /fluentd/etc
+              readOnly: true
+            - name: container-logs
+              mountPath: /var/log/containers
+              readOnly: true
+            - name: pod-logs
+              mountPath: /var/log/pods
+              readOnly: true
+            - name: state
+              mountPath: /fluentd/state
+            - name: buffer
+              mountPath: /fluentd/buffer
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: efk-fluentd
+        - name: container-logs
+          hostPath:
+            path: /var/log/containers
+            type: Directory
+        - name: pod-logs
+          hostPath:
+            path: /var/log/pods
+            type: Directory
+        - name: state
+          hostPath:
+            path: {{ printf "/var/lib/ops-deploy-fluentd/%s-%s/state" .Values.project .Values.environment | quote }}
+            type: DirectoryOrCreate
+        - name: buffer
+          hostPath:
+            path: {{ printf "/var/lib/ops-deploy-fluentd/%s-%s/buffer" .Values.project .Values.environment | quote }}
+            type: DirectoryOrCreate
+        - name: tmp
+          emptyDir: {}

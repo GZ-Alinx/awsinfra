@@ -1,0 +1,353 @@
+{{- if .Values.webUI.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "etcd.fullname" . }}-web-auth
+  labels:
+    {{- include "etcd.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  username: {{ .Values.webUI.username | quote }}
+  password: {{ .Values.webUI.password | quote }}
+  htpasswd: {{ printf "%s:{PLAIN}%s" .Values.webUI.username .Values.webUI.password | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "etcd.fullname" . }}-web-proxy
+  labels:
+    {{- include "etcd.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    pid /tmp/nginx.pid;
+    events {}
+    http {
+      access_log /dev/stdout;
+      error_log /dev/stderr warn;
+      client_body_temp_path /tmp/client_temp;
+      proxy_temp_path /tmp/proxy_temp;
+      fastcgi_temp_path /tmp/fastcgi_temp;
+      uwsgi_temp_path /tmp/uwsgi_temp;
+      scgi_temp_path /tmp/scgi_temp;
+      server {
+        listen 8080;
+        server_name _;
+        auth_basic "etcd management";
+        auth_basic_user_file /etc/nginx/auth/htpasswd;
+        location / {
+          proxy_http_version 1.1;
+          proxy_set_header Host $host;
+          proxy_set_header X-Forwarded-Host $host;
+          proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_pass http://127.0.0.1:3000;
+        }
+      }
+    }
+  {{- if .Values.tls.enabled }}
+  envoy.yaml: |
+    static_resources:
+      listeners:
+        - name: etcd_plaintext
+          address:
+            socket_address:
+              # Bind the pod address as well as loopback so kubelet can verify
+              # that the listener is ready. The NetworkPolicy below keeps this
+              # plaintext sidecar port inaccessible from other pods.
+              address: 0.0.0.0
+              port_value: 12379
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.tcp_proxy
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+                    stat_prefix: etcd_grpc
+                    cluster: etcd_mtls
+      clusters:
+        - name: etcd_mtls
+          connect_timeout: 5s
+          type: STRICT_DNS
+          load_assignment:
+            cluster_name: etcd_mtls
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ include "etcd.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+                          port_value: 2379
+          transport_socket:
+            name: envoy.transport_sockets.tls
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+              sni: {{ include "etcd.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+              common_tls_context:
+                alpn_protocols: ["h2"]
+                tls_certificates:
+                  - certificate_chain:
+                      filename: /tls/tls.crt
+                    private_key:
+                      filename: /tls/tls.key
+                validation_context:
+                  trusted_ca:
+                    filename: /tls/ca.crt
+                  match_typed_subject_alt_names:
+                    - san_type: DNS
+                      matcher:
+                        exact: {{ include "etcd.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "etcd.fullname" . }}-web
+  labels:
+    {{- include "etcd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "etcd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web-ui
+  template:
+    metadata:
+      labels:
+        {{- include "etcd.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: web-ui
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: auth-proxy
+          image: {{ .Values.webUI.authProxyImage | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["nginx", "-c", "/etc/nginx/custom/nginx.conf", "-g", "daemon off;"]
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: proxy-config
+              mountPath: /etc/nginx/custom
+              readOnly: true
+            - name: web-auth
+              mountPath: /etc/nginx/auth
+              readOnly: true
+            - name: proxy-tmp
+              mountPath: /tmp
+        - name: frontend
+          image: {{ .Values.webUI.frontendImage | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: BACKEND_URL
+              value: http://127.0.0.1:8081
+          ports:
+            - name: frontend
+              containerPort: 3000
+          readinessProbe:
+            tcpSocket:
+              port: frontend
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+        - name: backend
+          image: {{ .Values.webUI.backendImage | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SERVER_PORT
+              value: "8081"
+            - name: ETCD_ENDPOINTS
+              {{- if .Values.tls.enabled }}
+              value: http://127.0.0.1:12379
+              {{- else }}
+              value: http://{{ include "etcd.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:2379
+              {{- end }}
+            - name: DATASTORE_MEILISEARCH_HOST
+              value: http://127.0.0.1:7700
+          ports:
+            - name: backend
+              containerPort: 8081
+          readinessProbe:
+            tcpSocket:
+              port: backend
+            initialDelaySeconds: 8
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.webUI.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+        - name: search
+          image: {{ .Values.webUI.searchImage | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MEILI_NO_ANALYTICS
+              value: "true"
+            - name: MEILI_ENV
+              value: development
+            # Meilisearch otherwise sizes its indexer from node memory rather
+            # than the container cgroup on some hosts and can be OOM-killed.
+            - name: MEILI_MAX_INDEXING_MEMORY
+              value: {{ .Values.webUI.searchMaxIndexingMemory | quote }}
+            - name: MEILI_MAX_INDEXING_THREADS
+              value: {{ .Values.webUI.searchMaxIndexingThreads | quote }}
+          ports:
+            - name: search
+              containerPort: 7700
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: search
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.webUI.searchResources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: search-data
+              mountPath: /meili_data
+        {{- if .Values.tls.enabled }}
+        # EtcdFinder only supports an insecure gRPC endpoint. Envoy terminates
+        # mTLS and explicitly negotiates ALPN h2 with etcd.
+        - name: etcd-tls-proxy
+          image: {{ .Values.webUI.grpcProxyImage | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - -c
+            - /etc/envoy/envoy.yaml
+            - --log-level
+            - warning
+          ports:
+            - name: etcd-proxy
+              containerPort: 12379
+          readinessProbe:
+            tcpSocket:
+              port: etcd-proxy
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: proxy-config
+              mountPath: /etc/envoy
+              readOnly: true
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+            - name: proxy-tmp
+              mountPath: /tmp
+        {{- end }}
+      volumes:
+        - name: proxy-config
+          configMap:
+            name: {{ include "etcd.fullname" . }}-web-proxy
+        - name: web-auth
+          secret:
+            secretName: {{ include "etcd.fullname" . }}-web-auth
+        {{- if .Values.tls.enabled }}
+        - name: tls
+          secret:
+            secretName: {{ .Values.tlsSecretName }}
+        {{- end }}
+        - name: search-data
+          emptyDir: {}
+        - name: proxy-tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "etcd.fullname" . }}-web
+  labels:
+    {{- include "etcd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web-ui
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "etcd.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: web-ui
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "etcd.fullname" . }}-web
+  labels:
+    {{- include "etcd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web-ui
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "etcd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web-ui
+  policyTypes:
+    - Ingress
+  ingress:
+    # Only the authenticated Nginx entry point is reachable outside this pod.
+    # Envoy's plaintext gRPC port remains sidecar-only.
+    - ports:
+        - protocol: TCP
+          port: 8080
+{{- end }}

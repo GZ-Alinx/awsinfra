@@ -1,0 +1,40 @@
+image:
+  repository: bytebase/bytebase
+  tag: "3.20.1"
+  pullPolicy: IfNotPresent
+
+service:
+  port: 8080
+
+admin:
+  email: admin@ops-deploy.local
+  title: Platform Admin
+  password: ""
+
+integration:
+  mysql:
+    enabled: false
+    instanceId: ops-managed-mysql
+    title: Platform MySQL
+    host: ""
+    port: 3306
+    username: root
+    password: ""
+
+persistence:
+  enabled: true
+  storageClass: gp3
+  size: 20Gi
+  retainOnDelete: true
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

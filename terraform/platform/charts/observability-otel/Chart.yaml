@@ -1,0 +1,6 @@
+apiVersion: v2
+name: observability-otel
+description: Production-oriented OpenTelemetry agent and gateway stack for EKS
+type: application
+version: 0.2.0
+appVersion: "0.158.0"

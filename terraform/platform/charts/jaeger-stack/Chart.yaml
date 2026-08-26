@@ -1,0 +1,6 @@
+apiVersion: v2
+name: jaeger-stack
+description: Platform-managed Jaeger v2 collector, persistent trace storage and authenticated query UI
+type: application
+version: 0.1.1
+appVersion: "2.20.0"
