@@ -34,6 +34,16 @@ flowchart LR
     TF2 --> CLUSTER["Add-ons · Gateway · CI/CD · Observability"]
 ```
 
+## 界面预览
+
+### 登录界面
+
+![AWSInfra 登录界面](docs/images/login.jpg)
+
+### 项目管理
+
+![AWSInfra 项目管理界面（演示数据）](docs/images/project-management.png)
+
 ## 五分钟本地启动
 
 不需要 Go/Node.js 的用户可直接从 [GitHub Releases](https://github.com/GZ-Alinx/awsinfra/releases) 下载对应系统安装包。安装包内已包含管理端与前端、Terraform/Helm 模板、默认配置和完整文档：
