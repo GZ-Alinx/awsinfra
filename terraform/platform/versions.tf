@@ -8,7 +8,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.90"
+      version = "~> 6.62"
     }
     helm = {
       source  = "hashicorp/helm"
